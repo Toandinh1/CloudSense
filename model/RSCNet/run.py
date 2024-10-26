@@ -22,9 +22,12 @@ def main_RSCNet(data_loader, model_config, device, checkpoint_folder):
                             weight_decay=model_config["weight_decay"]
                             )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, model_config['epoch'])
+    torch.cuda.empty_cache()
     for epoch in tqdm(range(model_config['epoch'])):
+        torch.cuda.empty_cache()
         model.train()
         for idx, data in enumerate(data_loader['train']):
+            torch.cuda.empty_cache()
             optimizer.zero_grad()
             csi_data = data['input_wifi-csi']
             csi_data = csi_data.clone().detach().to(device)
@@ -54,7 +57,10 @@ def main_RSCNet(data_loader, model_config, device, checkpoint_folder):
         pck_10_iter = []
         pck_5_iter = []
         with torch.no_grad():
+            torch.cuda.empty_cache()
+            model.eval()
             for idx, data in enumerate(data_loader['valid']):
+                torch.cuda.empty_cache()
                 csi_data = data['input_wifi-csi']
                 csi_data = csi_data.clone().detach().to(device)
 
@@ -93,7 +99,10 @@ def main_RSCNet(data_loader, model_config, device, checkpoint_folder):
     
     model = torch.load(os.path.join(checkpoint_folder, "best.pt"), weights_only=False)
     metric = []
-    for idx, data in enumerate(data_loader['test']): 
+    torch.cuda.empty_cache()
+    model.eval()
+    for idx, data in enumerate(data_loader['test']):
+        torch.cuda.empty_cache()
         csi_data = data['input_wifi-csi']
         csi_data = csi_data.clone().detach().to(device)
 
