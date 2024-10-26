@@ -24,7 +24,7 @@ experiment_config = {
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1.5e-6,
-                "epoch": 300,
+                "epoch": 30,
             }
         }
     }
