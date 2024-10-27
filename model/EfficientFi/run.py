@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Oct 26 11:37:23 2024
+Created on Sat Oct 26 21:34:06 2024
 
 @author: jackson-devworks
 """
-import torch
 from torch import nn
+import torch
 from tqdm import tqdm
 import numpy as np
 import os
+from .model import EfficientFi
+from .utils import nmse, calulate_error, compute_pck_pckh, NMSELoss
 
-from .model import RSCNet
-from .utils import nmse, compute_pck_pckh, calulate_error
 
-def main_RSCNet(data_loader, model_config, device, checkpoint_folder):
-    model = RSCNet(config=model_config).to(device)
+def main_EfficientFi(data_loader, model_config, device, checkpoint_folder, check_compression_rate=True):
+    model = EfficientFi(model_config, check_compression_rate).to(device)
     criterion_L2 = nn.MSELoss().to(device)
+    ReconstructionLoss = NMSELoss().to(device)
     optimizer = torch.optim.SGD(model.parameters(), lr=model_config["lr"], 
                             momentum=model_config["momentum"], 
                             weight_decay=model_config["weight_decay"]
@@ -37,11 +38,11 @@ def main_RSCNet(data_loader, model_config, device, checkpoint_folder):
             xy_keypoint = keypoint[:,:,0:2].to(device)
             confidence = keypoint[:,:,2:3].to(device)
             
-            reconstructed_csi, pred_xy_keypoint = model(csi_data)
+            vq_loss, reconstructed_csi, pred_xy_keypoint = model(csi_data)
             #print(csi_data.size(), reconstructed_csi.size())
-            recontruction_loss = nmse(csi_data, reconstructed_csi)
+            recontruction_loss = ReconstructionLoss(csi_data, reconstructed_csi)
             hpe_loss = criterion_L2(torch.mul(confidence, pred_xy_keypoint), torch.mul(confidence, xy_keypoint))/32
-            loss = model_config['lambda'] * recontruction_loss + hpe_loss
+            loss = vq_loss + recontruction_loss + hpe_loss
             loss.backward()
             optimizer.step()
         
@@ -66,11 +67,11 @@ def main_RSCNet(data_loader, model_config, device, checkpoint_folder):
                 xy_keypoint = keypoint[:,:,0:2].to(device)
                 confidence = keypoint[:,:,2:3].to(device)
                 
-                reconstructed_csi, pred_xy_keypoint = model(csi_data)
+                _, reconstructed_csi, pred_xy_keypoint = model(csi_data)
                 #print(csi_data.size(), reconstructed_csi.size())
-                recontruction_loss = nmse(csi_data, reconstructed_csi)
-                hpe_loss = criterion_L2(torch.mul(confidence, pred_xy_keypoint), torch.mul(confidence, xy_keypoint))/32
-                loss = model_config['lambda'] * recontruction_loss + hpe_loss
+                #recontruction_loss = nmse(csi_data, reconstructed_csi)
+                #hpe_loss = criterion_L2(torch.mul(confidence, pred_xy_keypoint), torch.mul(confidence, xy_keypoint))/32
+                #loss = model_config['lambda'] * recontruction_loss + hpe_loss
                 
                 pred_xy_keypoint = pred_xy_keypoint.cpu()
                 xy_keypoint = xy_keypoint.cpu()
@@ -108,11 +109,11 @@ def main_RSCNet(data_loader, model_config, device, checkpoint_folder):
         xy_keypoint = keypoint[:,:,0:2].to(device)
         confidence = keypoint[:,:,2:3].to(device)
         
-        reconstructed_csi, pred_xy_keypoint = model(csi_data)
+        _, reconstructed_csi, pred_xy_keypoint = model(csi_data)
         #print(csi_data.size(), reconstructed_csi.size())
         recontruction_loss = nmse(csi_data, reconstructed_csi)
-        hpe_loss = criterion_L2(torch.mul(confidence, pred_xy_keypoint), torch.mul(confidence, xy_keypoint))/32
-        loss = model_config['lambda'] * recontruction_loss + hpe_loss
+        #hpe_loss = criterion_L2(torch.mul(confidence, pred_xy_keypoint), torch.mul(confidence, xy_keypoint))/32
+        #loss = _ + recontruction_loss + hpe_loss
         avg_nmse.append(recontruction_loss.item())
         pred_xy_keypoint = pred_xy_keypoint.cpu()
         xy_keypoint = xy_keypoint.cpu()

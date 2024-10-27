@@ -10,7 +10,7 @@ import yaml
 import torch
 import os
 
-from constant import experiment_config
+from constant import experiment_config, skip_pipeline
 from dataset_lib import make_dataset, make_dataloader
 
 
@@ -33,6 +33,8 @@ data_loader = {
 }
 
 for k, v in experiment_config['baseline'].items():
+    if k in skip_pipeline:
+        continue
     print("*"*100)
     print(f"Baseline {k}")
     pipeline = v["pipeline"]
