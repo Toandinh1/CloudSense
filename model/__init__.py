@@ -8,3 +8,4 @@ Created on Sat Oct 26 11:00:17 2024
 
 from .RSCNet import main_RSCNet
 from .EfficientFi import main_EfficientFi
+from .CSINet import main_CSINet

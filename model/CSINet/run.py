@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Oct 26 21:34:06 2024
+Created on Mon Oct 28 14:16:14 2024
 
 @author: jackson-devworks
 """
@@ -10,20 +10,22 @@ import torch
 from tqdm import tqdm
 import numpy as np
 import os
-from .model import EfficientFi
+from .model import CsiNetAutoencoder
 from .utils import nmse, calulate_error, compute_pck_pckh, NMSELoss
 
 theory_real_compressrate_dict = {
-    "1": 1/0.75,
-    "34.2": 1/21
+    "1": 1,
+    "36": 36,
+    "86": 85,
+    "1710": 1700
 }
-def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, check_compression_rate=False):
+
+def main_CSINet(data_loader, model_config, device, all_checkpoint_folder, check_compression_rate=False):
     for k, v in theory_real_compressrate_dict.items():
-        torch.cuda.empty_cache()
         print(f"with compress rate {k}: ")
         checkpoint_folder = os.path.join(all_checkpoint_folder, k)
         os.makedirs(checkpoint_folder, exist_ok=True)
-        model = EfficientFi(model_config, check_compression_rate, compression_rate=v).to(device)
+        model = CsiNetAutoencoder(config=model_config, check_compression_rate=check_compression_rate, compression_rate=v).to(device)
         criterion_L2 = nn.MSELoss().to(device)
         ReconstructionLoss = NMSELoss().to(device)
         optimizer = torch.optim.SGD(model.parameters(), lr=model_config["lr"], 
@@ -34,10 +36,8 @@ def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, c
         torch.cuda.empty_cache()
         for epoch in tqdm(range(model_config['epoch'])):
             torch.cuda.empty_cache()
-            torch.cuda.empty_cache()
             model.train()
             for idx, data in enumerate(data_loader['train']):
-                torch.cuda.empty_cache()
                 torch.cuda.empty_cache()
                 optimizer.zero_grad()
                 csi_data = data['input_wifi-csi']
@@ -48,11 +48,11 @@ def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, c
                 xy_keypoint = keypoint[:,:,0:2].to(device)
                 confidence = keypoint[:,:,2:3].to(device)
                 
-                vq_loss, reconstructed_csi, pred_xy_keypoint = model(csi_data)
+                reconstructed_csi, pred_xy_keypoint = model(csi_data)
                 #print(csi_data.size(), reconstructed_csi.size())
                 recontruction_loss = ReconstructionLoss(csi_data, reconstructed_csi)
                 hpe_loss = criterion_L2(torch.mul(confidence, pred_xy_keypoint), torch.mul(confidence, xy_keypoint))/32
-                loss = vq_loss + recontruction_loss + hpe_loss
+                loss = recontruction_loss + hpe_loss
                 loss.backward()
                 optimizer.step()
             
@@ -77,11 +77,11 @@ def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, c
                     xy_keypoint = keypoint[:,:,0:2].to(device)
                     confidence = keypoint[:,:,2:3].to(device)
                     
-                    _, reconstructed_csi, pred_xy_keypoint = model(csi_data)
+                    reconstructed_csi, pred_xy_keypoint = model(csi_data)
                     #print(csi_data.size(), reconstructed_csi.size())
-                    #recontruction_loss = nmse(csi_data, reconstructed_csi)
-                    #hpe_loss = criterion_L2(torch.mul(confidence, pred_xy_keypoint), torch.mul(confidence, xy_keypoint))/32
-                    #loss = model_config['lambda'] * recontruction_loss + hpe_loss
+                    recontruction_loss = ReconstructionLoss(csi_data, reconstructed_csi)
+                    hpe_loss = criterion_L2(torch.mul(confidence, pred_xy_keypoint), torch.mul(confidence, xy_keypoint))/32
+                    loss = recontruction_loss + hpe_loss
                     
                     pred_xy_keypoint = pred_xy_keypoint.cpu()
                     xy_keypoint = xy_keypoint.cpu()
@@ -119,11 +119,11 @@ def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, c
             xy_keypoint = keypoint[:,:,0:2].to(device)
             confidence = keypoint[:,:,2:3].to(device)
             
-            _, reconstructed_csi, pred_xy_keypoint = model(csi_data)
+            reconstructed_csi, pred_xy_keypoint = model(csi_data)
             #print(csi_data.size(), reconstructed_csi.size())
             recontruction_loss = nmse(csi_data, reconstructed_csi)
-            #hpe_loss = criterion_L2(torch.mul(confidence, pred_xy_keypoint), torch.mul(confidence, xy_keypoint))/32
-            #loss = _ + recontruction_loss + hpe_loss
+            hpe_loss = criterion_L2(torch.mul(confidence, pred_xy_keypoint), torch.mul(confidence, xy_keypoint))/32
+            loss = recontruction_loss + hpe_loss
             avg_nmse.append(recontruction_loss.item())
             pred_xy_keypoint = pred_xy_keypoint.cpu()
             xy_keypoint = xy_keypoint.cpu()

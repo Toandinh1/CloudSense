@@ -6,7 +6,7 @@ Created on Mon Oct 21 09:16:35 2024
 @author: jackson-devworks
 """
 
-from model import main_RSCNet, main_EfficientFi
+from model import main_RSCNet, main_EfficientFi, main_CSINet
 
 experiment_config = {
     "mmfi_config": "/home/jackson-devworks/Desktop/CloudSense/dataset_lib/config.yaml",
@@ -23,7 +23,7 @@ experiment_config = {
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1.5e-6,
-                "epoch": 3,
+                "epoch": 20,
             }
         },
         "EfficientFi": {
@@ -35,10 +35,23 @@ experiment_config = {
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1.5e-6,
-                "epoch": 3,
+                "epoch": 20,
+            }
+        }, 
+        "CSINet": {
+            "pipeline": main_CSINet,
+            "config": {
+                "img_channels":3,
+                "img_height": 114,
+                "img_width": 10,
+                "residual_num": 2,
+                "lr": 1e-2,
+                "momentum": 0.9,
+                "weight_decay": 1.5e-6,
+                "epoch": 20,
             }
         }
     }
 }
 
-skip_pipeline = []
+skip_pipeline = ["RESCNet","EfficientFi"]
