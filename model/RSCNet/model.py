@@ -12,9 +12,33 @@ import numpy as np
 
 from .module import Encoder, RecurrentBlock, Decoder, HumanPoseEstimator
 
+
+def compute_compression_rate(original_tensor: torch.Tensor, compressed_tensor: torch.Tensor):
+    """
+    Compute the compression rate of a tensor.
+
+    Parameters:
+    - original_tensor: The original tensor before compression.
+    - compressed_tensor: The tensor after compression.
+
+    Returns:
+    - A tensor representing the compression rate.
+    """
+    print(original_tensor.size(), compressed_tensor.size())
+    # Get the sizes of the original and compressed tensors
+    original_size = original_tensor.numel()  # Total number of elements in the original tensor
+    compressed_size = compressed_tensor.numel()  # Total number of elements in the compressed tensor
+
+    # Compute compression rate
+    compression_rate = original_size / compressed_size if compressed_size > 0 else torch.tensor(float('inf'))  # Handle division by zero
+
+    return compression_rate
+
 class RSCNet(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, check_compression_rate=True, compression_rate = 1):
         super(RSCNet, self).__init__()
+        self.check_compression_rate = check_compression_rate
+        self.compression_rate = compression_rate
         self.config = config
         self.num_frames = config["num_frame"]
         self.input_shape = [3, self.num_frames, 10]
@@ -24,12 +48,12 @@ class RSCNet(nn.Module):
         self.input_size = np.prod(self.input_shape)
         self.encoder_fc = nn.Sequential(
 			nn.Flatten(),
-			nn.Linear(1710 , int(self.input_size/self.config["compression_rate"])),
+			nn.Linear(1710 , int(self.input_size/self.compression_rate)),
 		)
         
         # Recurrent block before passing through decoder - reconstruction or downstreamtask - HPE
         c,w,h = self.input_shape
-        self.embedding_size = c*w*h//self.config["compression_rate"]
+        self.embedding_size = c*w*h//self.compression_rate
         self.recurrent_block = RecurrentBlock(self.embedding_size, self.config["recurrent_block"])
         
         # Decoder in Cloud
@@ -55,7 +79,8 @@ class RSCNet(nn.Module):
         c = self.encoder_fc(z_e)
         seq_c = c.view(batch_size, self.sequence_length, -1)
 
-
+        if self.check_compression_rate:
+            print(f"Compression rate: {compute_compression_rate(x, seq_c)}")
         # Recurrent block
         seq_c_r_d, _ = self.recurrent_block(seq_c)
         seq_c_r_d = seq_c_r_d.contiguous()

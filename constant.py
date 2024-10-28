@@ -24,10 +24,10 @@ experiment_config = {
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1.5e-6,
-                "epoch": 30,
+                "epoch": 3,
             }
         },
-        "Efficient": {
+        "EfficientFi": {
             "pipeline": main_EfficientFi,
             "config": {
                 "embedding_dim": 32,
@@ -42,4 +42,4 @@ experiment_config = {
     }
 }
 
-skip_pipeline = ["RESCNet"]
+skip_pipeline = ["EfficientFi"]
