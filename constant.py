@@ -16,7 +16,6 @@ experiment_config = {
         "RESCNet": {
             "pipeline": main_RSCNet,
             "config": {
-                "compression_rate": 500,
                 "recurrent_block": 256,
                 "expansion": 1,
                 "num_frame": 57,
@@ -42,4 +41,4 @@ experiment_config = {
     }
 }
 
-skip_pipeline = ["EfficientFi"]
+skip_pipeline = []

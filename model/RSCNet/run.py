@@ -25,6 +25,7 @@ def main_RSCNet(data_loader, model_config, device, all_checkpoint_folder, check_
     for k, v in theory_real_compressrate_dict.items():
         print(f"with compress rate {k}: ")
         checkpoint_folder = os.path.join(all_checkpoint_folder, k)
+        os.makedirs(checkpoint_folder, exist_ok=True)
         model = RSCNet(config=model_config, check_compression_rate=check_compression_rate, compression_rate=v).to(device)
         criterion_L2 = nn.MSELoss().to(device)
         optimizer = torch.optim.SGD(model.parameters(), lr=model_config["lr"], 

@@ -17,9 +17,11 @@ theory_real_compressrate_dict = {
     "1": 1/0.75,
     "34.2": 1/21
 }
-def main_EfficientFi(data_loader, model_config, device, checkpoint_folder, check_compression_rate=False):
+def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, check_compression_rate=False):
     for k, v in theory_real_compressrate_dict.items():
         print(f"with compress rate {k}: ")
+        checkpoint_folder = os.path.join(all_checkpoint_folder, k)
+        os.makedirs(checkpoint_folder, exist_ok=True)
         model = EfficientFi(model_config, check_compression_rate, compression_rate=v).to(device)
         criterion_L2 = nn.MSELoss().to(device)
         ReconstructionLoss = NMSELoss().to(device)
