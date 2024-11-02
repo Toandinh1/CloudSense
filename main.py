@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -31,14 +32,18 @@ data_loader = {
     "valid": val_loader,
     "test" : test_loader    
 }
-
-for k, v in experiment_config['baseline'].items():
-    if k in skip_pipeline:
-        continue
-    print("*"*100)
-    print(f"Baseline {k}")
-    pipeline = v["pipeline"]
-    model_config = v['config']
-    checkpoint_folder = os.path.join(experiment_config["checkpoint_folder"], k)
-    os.makedirs(checkpoint_folder, exist_ok=True)
-    pipeline(data_loader, model_config, device, checkpoint_folder)
+for i in range(1):
+    print("*" * 20)
+    torch.cuda.empty_cache()
+    print(f"Run {i+1}")
+    for k, v in experiment_config['baseline'].items():
+        if k in skip_pipeline:
+            continue
+        print("*"*10)
+        print(f"Baseline {k}")
+        pipeline = v["pipeline"]
+        model_config = v['config']
+        checkpoint_folder = os.path.join(experiment_config["checkpoint_folder"], k)
+        os.makedirs(checkpoint_folder, exist_ok=True)
+        pipeline(data_loader, model_config, device, checkpoint_folder)
+        

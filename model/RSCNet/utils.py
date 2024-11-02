@@ -7,7 +7,16 @@ Created on Sat Oct 26 15:28:36 2024
 """
 import torch
 import numpy as np
+from torch import nn
 
+class NMSELoss(nn.Module):
+    def __init__(self):
+        super(NMSELoss,self).__init__()
+    
+    def forward(self,original,recovered):
+        loss = (torch.mean(torch.square(original-recovered))/torch.sum(torch.square(original)))
+        return loss
+    
 def nmse(x, x_hat):
     return 10 * torch.log10(torch.mean(torch.mean(torch.square(x-x_hat), dim=(1,2,3))/torch.mean(torch.square(x), dim=(1,2,3))))
 

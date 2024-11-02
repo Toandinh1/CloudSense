@@ -24,7 +24,7 @@ def compute_compression_rate(original_tensor: torch.Tensor, compressed_tensor: t
     Returns:
     - A tensor representing the compression rate.
     """
-    print(original_tensor.size(), compressed_tensor.size())
+    #print(original_tensor.size(), compressed_tensor.size())
     # Get the sizes of the original and compressed tensors
     original_size = original_tensor.numel()  # Total number of elements in the original tensor
     compressed_size = compressed_tensor.numel()  # Total number of elements in the compressed tensor
@@ -35,9 +35,8 @@ def compute_compression_rate(original_tensor: torch.Tensor, compressed_tensor: t
     return compression_rate
 
 class RSCNet(nn.Module):
-    def __init__(self, config, check_compression_rate=True, compression_rate = 1):
+    def __init__(self, config=True, compression_rate = 1):
         super(RSCNet, self).__init__()
-        self.check_compression_rate = check_compression_rate
         self.compression_rate = compression_rate
         self.config = config
         self.num_frames = config["num_frame"]
@@ -66,7 +65,7 @@ class RSCNet(nn.Module):
         # HPE Task
         self.human_pose_estimator = HumanPoseEstimator(512, 34, 32)
         
-    def forward(self, x):
+    def forward(self, x, check_compression_rate = False):
         batch_size = x.shape[0]
         #print(f"x shape: {x.size()}")
         new_x = x.permute(0,2,1,3).contiguous()
@@ -79,7 +78,8 @@ class RSCNet(nn.Module):
         c = self.encoder_fc(z_e)
         seq_c = c.view(batch_size, self.sequence_length, -1)
 
-        if self.check_compression_rate:
+        if check_compression_rate:
+            print(f"\nEncoder size: {seq_c.size()}")
             print(f"Compression rate: {compute_compression_rate(x, seq_c)}")
         # Recurrent block
         seq_c_r_d, _ = self.recurrent_block(seq_c)

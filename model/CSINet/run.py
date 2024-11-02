@@ -11,27 +11,26 @@ from tqdm import tqdm
 import numpy as np
 import os
 from .model import CsiNetAutoencoder
-from .utils import nmse, calulate_error, compute_pck_pckh, NMSELoss
+from .utils import nmse, calulate_error, compute_pck_pckh, NMSELoss, NMSE
 
 theory_real_compressrate_dict = {
     "1": 1,
-    "36": 36,
-    "86": 85,
-    "1710": 1700
+    "34": 34,
+    "84": 84,
+    "1710": 1710
 }
 
-def main_CSINet(data_loader, model_config, device, all_checkpoint_folder, check_compression_rate=False):
+def main_CSINet(data_loader, model_config, device, all_checkpoint_folder):
     for k, v in theory_real_compressrate_dict.items():
+        print("*"*5)
         print(f"with compress rate {k}: ")
+        check_compression_rate = True
         checkpoint_folder = os.path.join(all_checkpoint_folder, k)
         os.makedirs(checkpoint_folder, exist_ok=True)
-        model = CsiNetAutoencoder(config=model_config, check_compression_rate=check_compression_rate, compression_rate=v).to(device)
-        criterion_L2 = nn.MSELoss().to(device)
-        ReconstructionLoss = NMSELoss().to(device)
-        optimizer = torch.optim.SGD(model.parameters(), lr=model_config["lr"], 
-                                momentum=model_config["momentum"], 
-                                weight_decay=model_config["weight_decay"]
-                                )
+        model = CsiNetAutoencoder(config=model_config, compression_rate=v).to(device)
+        criterion_L2 = NMSELoss().to(device)
+        ReconstructionLoss = NMSE
+        optimizer = torch.optim.Adam(model.parameters(), lr = model_config['lr'])
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, model_config['epoch'])
         torch.cuda.empty_cache()
         for epoch in tqdm(range(model_config['epoch'])):
@@ -48,7 +47,8 @@ def main_CSINet(data_loader, model_config, device, all_checkpoint_folder, check_
                 xy_keypoint = keypoint[:,:,0:2].to(device)
                 confidence = keypoint[:,:,2:3].to(device)
                 
-                reconstructed_csi, pred_xy_keypoint = model(csi_data)
+                reconstructed_csi, pred_xy_keypoint = model(csi_data, check_compression_rate)
+                check_compression_rate = False
                 #print(csi_data.size(), reconstructed_csi.size())
                 recontruction_loss = ReconstructionLoss(csi_data, reconstructed_csi)
                 hpe_loss = criterion_L2(torch.mul(confidence, pred_xy_keypoint), torch.mul(confidence, xy_keypoint))/32
@@ -56,7 +56,7 @@ def main_CSINet(data_loader, model_config, device, all_checkpoint_folder, check_
                 loss.backward()
                 optimizer.step()
             
-            pck_50_overall_max = 0
+            nmse_min = 1e10
             metric = []
             pck_50_iter = []
             pck_40_iter = []
@@ -64,6 +64,7 @@ def main_CSINet(data_loader, model_config, device, all_checkpoint_folder, check_
             pck_20_iter = []
             pck_10_iter = []
             pck_5_iter = []
+            avg_nmse = []
             with torch.no_grad():
                 torch.cuda.empty_cache()
                 model.eval()
@@ -82,7 +83,8 @@ def main_CSINet(data_loader, model_config, device, all_checkpoint_folder, check_
                     recontruction_loss = ReconstructionLoss(csi_data, reconstructed_csi)
                     hpe_loss = criterion_L2(torch.mul(confidence, pred_xy_keypoint), torch.mul(confidence, xy_keypoint))/32
                     loss = recontruction_loss + hpe_loss
-                    
+                    avg_nmse.append(recontruction_loss.item())
+
                     pred_xy_keypoint = pred_xy_keypoint.cpu()
                     xy_keypoint = xy_keypoint.cpu()
                     pred_xy_keypoint_pck = torch.transpose(pred_xy_keypoint, 1, 2)
@@ -98,13 +100,16 @@ def main_CSINet(data_loader, model_config, device, all_checkpoint_folder, check_
                 pck_20 = np.mean(pck_20_iter,0)
                 pck_50_overall = pck_50[17]
                 pck_20_overall = pck_20[17]
-                if pck_50_overall > pck_50_overall_max:
+                avg_nmse =  np.mean(avg_nmse)
+                if nmse_min > avg_nmse:
                    #print('saving the model at the end of epoch %d with pck_50: %.3f' % (epoch_index, pck_50_overall))
                    torch.save(model, os.path.join(checkpoint_folder, "best.pt"))
-                   pck_50_overall_max = pck_50_overall
+                   nmse_min = avg_nmse
+                torch.save(model, os.path.join(checkpoint_folder, "last.pt"))
+            
             scheduler.step()
         
-        model = torch.load(os.path.join(checkpoint_folder, "best.pt"), weights_only=False)
+        model = torch.load(os.path.join(checkpoint_folder, "last.pt"), weights_only=False)
         metric = []
         avg_nmse = []
         torch.cuda.empty_cache()

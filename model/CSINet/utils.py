@@ -21,6 +21,18 @@ class NMSELoss(nn.Module):
 def nmse(x, x_hat):
     return 10 * torch.log10(torch.mean(torch.mean(torch.square(x-x_hat), dim=(1,2,3))/torch.mean(torch.square(x), dim=(1,2,3))))
 
+def NMSE(x, x_hat):
+    x_test_real = torch.reshape(x[:, 0, :, :], (len(x), -1))
+    x_test_imag = torch.reshape(x[:, 1, :, :], (len(x), -1))
+    x_hat_real = torch.reshape(x_hat[:, 0, :, :], (len(x_hat), -1))
+    x_hat_imag = torch.reshape(x_hat[:, 1, :, :], (len(x_hat), -1))
+    power = torch.sum(x_test_real ** 2 + x_test_imag ** 2, axis=1)
+    mse = torch.sum((x_test_real - x_hat_real) ** 2 + (x_test_imag - x_hat_imag) ** 2, axis=1)
+    nmse = torch.mean(mse / power)
+    # print(power)
+    # print(mse)
+    return nmse
+
 def compute_pck_pckh(dt_kpts,gt_kpts,thr):
     """
     pck指标计算

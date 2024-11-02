@@ -13,7 +13,7 @@ experiment_config = {
     "dataset_root": "/home/jackson-devworks/Desktop/HPE/Dataset",
     "checkpoint_folder": "/home/jackson-devworks/Desktop/CloudSense/output",
     "baseline": {
-        "RESCNet": {
+        "RSCNet": {
             "pipeline": main_RSCNet,
             "config": {
                 "recurrent_block": 256,
@@ -29,12 +29,11 @@ experiment_config = {
         "EfficientFi": {
             "pipeline": main_EfficientFi,
             "config": {
-                "embedding_dim": 32,
-                "num_embeddings": 512,
+                "embedding_dim": 256,
                 "commitment_cost": 1,
                 "lr": 1e-2,
                 "momentum": 0.9,
-                "weight_decay": 1.5e-6,
+                "weight_decay": 1e-5,
                 "epoch": 20,
             }
         }, 
@@ -44,7 +43,7 @@ experiment_config = {
                 "img_channels":3,
                 "img_height": 114,
                 "img_width": 10,
-                "residual_num": 2,
+                "residual_num": 1,
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1.5e-6,
@@ -54,4 +53,4 @@ experiment_config = {
     }
 }
 
-skip_pipeline = ["RESCNet","EfficientFi"]
+skip_pipeline = []
