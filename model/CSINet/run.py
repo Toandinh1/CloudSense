@@ -28,7 +28,7 @@ def main_CSINet(data_loader, model_config, device, all_checkpoint_folder):
         checkpoint_folder = os.path.join(all_checkpoint_folder, k)
         os.makedirs(checkpoint_folder, exist_ok=True)
         model = CsiNetAutoencoder(config=model_config, compression_rate=v).to(device)
-        criterion_L2 = NMSELoss().to(device)
+        criterion_L2 = nn.MSELoss().to(device)
         ReconstructionLoss = NMSE
         optimizer = torch.optim.Adam(model.parameters(), lr = model_config['lr'])
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, model_config['epoch'])

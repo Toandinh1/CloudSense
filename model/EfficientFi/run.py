@@ -26,7 +26,7 @@ def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, c
         checkpoint_folder = os.path.join(all_checkpoint_folder, str(k))
         os.makedirs(checkpoint_folder, exist_ok=True)
         model = EfficientFi(model_config, k).to(device)
-        criterion_L2 = NMSELoss().to(device)
+        criterion_L2 = nn.MSELoss().to(device)
         ReconstructionLoss = NMSELoss().to(device)
         optimizer = torch.optim.SGD(model.parameters(), lr=model_config["lr"], 
                                 momentum=model_config["momentum"], 

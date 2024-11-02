@@ -30,7 +30,7 @@ def main_RSCNet(data_loader, model_config, device, all_checkpoint_folder):
         checkpoint_folder = os.path.join(all_checkpoint_folder, k)
         os.makedirs(checkpoint_folder, exist_ok=True)
         model = RSCNet(config=model_config, compression_rate=v).to(device)
-        criterion_L2 = NMSELoss().to(device)
+        criterion_L2 = nn.MSELoss().to(device)
         optimizer = torch.optim.SGD(model.parameters(), lr=model_config["lr"], 
                                 momentum=model_config["momentum"], 
                                 weight_decay=model_config["weight_decay"]
