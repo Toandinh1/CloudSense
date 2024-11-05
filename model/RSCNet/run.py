@@ -37,6 +37,7 @@ def main_RSCNet(data_loader, model_config, device, all_checkpoint_folder):
                                 )
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, model_config['epoch'])
         torch.cuda.empty_cache()
+        pck_50_overall_max = 0
         for epoch in tqdm(range(model_config['epoch'])):
             torch.cuda.empty_cache()
             model.train()
@@ -105,10 +106,10 @@ def main_RSCNet(data_loader, model_config, device, all_checkpoint_folder):
                 pck_50_overall = pck_50[17]
                 pck_20_overall = pck_20[17]
                 avg_nmse =  np.mean(avg_nmse)
-                if nmse_min > avg_nmse:
+                if pck_50_overall > pck_50_overall_max:
                    #print('saving the model at the end of epoch %d with pck_50: %.3f' % (epoch_index, pck_50_overall))
                    torch.save(model, os.path.join(checkpoint_folder, "best.pt"))
-                   nmse_min = avg_nmse
+                   pck_50_overall_max = pck_50_overall
                 torch.save(model, os.path.join(checkpoint_folder, "last.pt"))
             scheduler.step()
         

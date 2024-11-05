@@ -60,7 +60,7 @@ split_to_use: random_split
 
 init_rand_seed: 0
 train_loader:
-  batch_size: 128
+  batch_size: 256
 val_loader:
   batch_size: 32
 test_loader:

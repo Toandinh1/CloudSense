@@ -34,11 +34,31 @@ def compute_compression_rate(original_tensor: torch.Tensor, compressed_tensor: t
     return compression_rate
 
 input_dim_hpe = {
-    1: 3420,
-    34: 100,
-    84: 40,
-    1710: 2
+    4: 855,
+    16: 213,
+    32: 106,
+    64: 53
 }
+
+def quantize_and_restore(tensor):
+    """
+    Quantizes a tensor by scaling, converting to integers, and then restores it to float32.
+
+    Parameters:
+    - tensor (torch.Tensor): The input tensor to quantize.
+    - scale_factor (float): A scaling factor to minimize information loss during conversion.
+
+    Returns:
+    - torch.Tensor: The tensor restored to float32 with minimized quantization loss.
+    """    
+    # Step 2: Convert the scaled tensor to integers (simulate quantization)
+    int_tensor = tensor.to(torch.int32)
+    
+    # Step 3: Convert back to float and undo scaling
+    restored_tensor = int_tensor.to(torch.float32)
+    
+    return restored_tensor
+
 class CsiNetAutoencoder(nn.Module):
     def __init__(self, config, compression_rate):
         super(CsiNetAutoencoder, self).__init__()

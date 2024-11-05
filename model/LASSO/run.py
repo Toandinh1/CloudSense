@@ -10,31 +10,29 @@ import torch
 from tqdm import tqdm
 import numpy as np
 import os
-from .model import CsiNetAutoencoder
+from .model import LassoAutoEncoder
 from .utils import nmse, calulate_error, compute_pck_pckh, NMSELoss, NMSE
 
 theory_real_compressrate_dict = {
-    #"4": 4,
-    #"16": 16,
-    #"32": 32,
-    "64": 64
+    "1": 1,
+    #"34": 34,
+    #"84": 84,
+    #"1710": 1710
 }
 
-def main_CSINet(data_loader, model_config, device, all_checkpoint_folder):
+def main_LASSO(data_loader, model_config, device, all_checkpoint_folder):
     for k, v in theory_real_compressrate_dict.items():
         print("*"*5)
         print(f"with compress rate {k}: ")
         check_compression_rate = True
         checkpoint_folder = os.path.join(all_checkpoint_folder, k)
         os.makedirs(checkpoint_folder, exist_ok=True)
-        model = CsiNetAutoencoder(config=model_config, compression_rate=v).to(device)
+        model = LassoAutoEncoder(config=model_config, compression_rate=v).to(device)
         criterion_L2 = nn.MSELoss().to(device)
         ReconstructionLoss =  nn.MSELoss().to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr = model_config['lr'])
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, model_config['epoch'])
         torch.cuda.empty_cache()
-        pck_50_overall_max = 0
-
         for epoch in tqdm(range(model_config['epoch'])):
             torch.cuda.empty_cache()
             model.train()
@@ -59,6 +57,7 @@ def main_CSINet(data_loader, model_config, device, all_checkpoint_folder):
                 optimizer.step()
             
             nmse_min = 1e10
+            pck_50_overall_max = 0
             metric = []
             pck_50_iter = []
             pck_40_iter = []
@@ -111,7 +110,7 @@ def main_CSINet(data_loader, model_config, device, all_checkpoint_folder):
             
             scheduler.step()
         
-        model = torch.load(os.path.join(checkpoint_folder, "last.pt"), weights_only=False)
+        model = torch.load(os.path.join(checkpoint_folder, "best.pt"), weights_only=False)
         metric = []
         avg_nmse = []
         torch.cuda.empty_cache()

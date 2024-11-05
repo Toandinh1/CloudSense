@@ -8,6 +8,7 @@ Created on Sat Oct 26 21:26:54 2024
 from torch import nn
 import torch
 from vector_quantize_pytorch import ResidualVQ, VectorQuantize
+import torch.nn.functional as F
 
 from .module import Encoder, Quantize, Decoder, HumanPoseEstimator
 
@@ -34,20 +35,21 @@ def compute_compression_rate(original_tensor: torch.Tensor, compressed_tensor: t
     return compression_rate
 
 compress_rate_fc_dim_dict = {
-    1: {
-        "num_embeddings": 4096,
-
+    67: {
+        "num_embeddings": 1024,
     },
-    34 : {
-        "num_embeddings": 102,
+    148 : {
+        "num_embeddings": 512,
     },
-    84: {
-        "num_embeddings": 56,
+    334: {
+        "num_embeddings": 256,
     },
-    1710: {
-        "num_embeddings": 4,
+    763: {
+        "num_embeddings": 128,
+    },
+    1781: {
+        "num_embeddings": 64,
     }
-    
 }
 class EfficientFi(nn.Module):
     def __init__(self, config, compress_rate):
@@ -70,18 +72,22 @@ class EfficientFi(nn.Module):
         self.hpe_estimator = HumanPoseEstimator(3456, 34, 32)
     
     def forward(self, x, check_compression_rate = False):
+        x = F.interpolate(x, size=(114, 500), mode="bilinear", align_corners=True)
         batch_size = x.shape[0]
         z, indices1, indices2 = self._encoder(x)
         vq = self._pre_vq_conv(z)
         loss, quantized, perplexity, _ = self._vq_vae(vq)
+        
         if check_compression_rate:
-            print(f"\nCompression rate: {compute_compression_rate(x, _)}")
-        #print(quantized.size())   
-        #latent = self._trans_vq_vae(quantized)
+            with torch.no_grad():
+                compression_rate = compute_compression_rate(x, _)
+            
+            print(f"\nEncoder size: {_.size()}")
+            print(f"Compression rate: {compression_rate}")
         latent = self._trans_vq_vae(quantized)
 
-        
         r_x = self._decoder(latent, indices2, indices1)
+        r_x = F.interpolate(r_x, size=(114, 10), mode="bilinear", align_corners=True)
         pred_keypoint = self.hpe_estimator(latent).reshape(batch_size, 17, 2)
-
+        
         return loss, r_x, pred_keypoint

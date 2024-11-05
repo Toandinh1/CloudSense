@@ -42,8 +42,6 @@ class Decoder(nn.Module):
         batch_size = x.shape[0]
         out = self.fc(x)
         out = torch.reshape(out, (batch_size, 3, 114, 10))  # Reshape to match input shape
-        out = self.refine1(out)
-        out = self.refine2(out)
         return out
 
 class Refinenet(nn.Module):

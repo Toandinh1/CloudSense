@@ -10,7 +10,7 @@ import torch
 from tqdm import tqdm
 import numpy as np
 import os
-from .model import CsiNetAutoencoder
+from .model import DeepCMC
 from .utils import nmse, calulate_error, compute_pck_pckh, NMSELoss, NMSE
 
 theory_real_compressrate_dict = {
@@ -20,14 +20,14 @@ theory_real_compressrate_dict = {
     "64": 64
 }
 
-def main_CSINet(data_loader, model_config, device, all_checkpoint_folder):
+def main_DeepCMC(data_loader, model_config, device, all_checkpoint_folder):
     for k, v in theory_real_compressrate_dict.items():
         print("*"*5)
         print(f"with compress rate {k}: ")
         check_compression_rate = True
         checkpoint_folder = os.path.join(all_checkpoint_folder, k)
         os.makedirs(checkpoint_folder, exist_ok=True)
-        model = CsiNetAutoencoder(config=model_config, compression_rate=v).to(device)
+        model = DeepCMC().to(device)
         criterion_L2 = nn.MSELoss().to(device)
         ReconstructionLoss =  nn.MSELoss().to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr = model_config['lr'])

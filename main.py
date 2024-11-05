@@ -43,6 +43,7 @@ for i in range(1):
         print(f"Baseline {k}")
         pipeline = v["pipeline"]
         model_config = v['config']
+        print(model_config)
         checkpoint_folder = os.path.join(experiment_config["checkpoint_folder"], k)
         os.makedirs(checkpoint_folder, exist_ok=True)
         pipeline(data_loader, model_config, device, checkpoint_folder)

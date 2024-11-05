@@ -44,8 +44,8 @@ class Quantize(nn.Module):
         quantized = torch.matmul(encodings, self._embedding.weight).view(input_shape)
         
         # Loss
-        e_latent_loss = F.mse_loss(quantized, inputs)
-        q_latent_loss = F.mse_loss(quantized, inputs)
+        e_latent_loss = F.mse_loss(quantized.detach(), inputs)
+        q_latent_loss = F.mse_loss(quantized, inputs.detach())
         loss = q_latent_loss + self._commitment_cost * e_latent_loss
         
         quantized = inputs + (quantized - inputs) 

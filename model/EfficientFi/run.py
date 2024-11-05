@@ -10,13 +10,12 @@ import torch
 from tqdm import tqdm
 import numpy as np
 import os
-import torch.nn.functional as F
 
 from .model import EfficientFi
 from .utils import nmse, calulate_error, compute_pck_pckh, NMSELoss
 
 #2.85, 34.2, 85.5
-compress_rate_list = [1,34,84,1710]
+compress_rate_list = [67, 148, 334, 763, 1781]
 
 def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, check_compression_rate=False):
     for k in compress_rate_list:
@@ -27,12 +26,13 @@ def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, c
         os.makedirs(checkpoint_folder, exist_ok=True)
         model = EfficientFi(model_config, k).to(device)
         criterion_L2 = nn.MSELoss().to(device)
-        ReconstructionLoss = NMSELoss().to(device)
+        ReconstructionLoss = nn.MSELoss().to(device)
         optimizer = torch.optim.SGD(model.parameters(), lr=model_config["lr"], 
                                 momentum=model_config["momentum"], 
                                 weight_decay=model_config["weight_decay"]
                                 )
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer,step_size=40,gamma=0.1)
+        pck_50_overall_max = 0
 
         torch.cuda.empty_cache()
         for epoch in tqdm(range(model_config['epoch'])):
@@ -45,7 +45,6 @@ def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, c
                 optimizer.zero_grad()
                 csi_data = data['input_wifi-csi']
                 csi_data = csi_data.clone().detach().to(device)
-                csi_data = F.interpolate(csi_data, size=(114, 500), mode='bilinear', align_corners=False)
 
         
                 keypoint = data['output']
@@ -61,7 +60,6 @@ def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, c
                 loss.backward()
                 optimizer.step()
             
-            pck_50_overall_max = 0
             metric = []
             pck_50_iter = []
             pck_40_iter = []
@@ -77,7 +75,6 @@ def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, c
                     csi_data = data['input_wifi-csi']
                     csi_data = csi_data.clone().detach().to(device)
     
-                    csi_data = F.interpolate(csi_data, size=(114, 500), mode='bilinear', align_corners=False)
 
                     keypoint = data['output']
                     xy_keypoint = keypoint[:,:,0:2].to(device)
@@ -108,6 +105,7 @@ def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, c
                    #print('saving the model at the end of epoch %d with pck_50: %.3f' % (epoch_index, pck_50_overall))
                    torch.save(model, os.path.join(checkpoint_folder, "best.pt"))
                    pck_50_overall_max = pck_50_overall
+                   print(f"\nBest Epoch in epoch {epoch} with {pck_50_overall_max}")
                 torch.save(model, os.path.join(checkpoint_folder, "last.pt"))
             scheduler.step()
         
@@ -120,8 +118,6 @@ def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, c
             torch.cuda.empty_cache()
             csi_data = data['input_wifi-csi']
             csi_data = csi_data.clone().detach().to(device)
-            csi_data = F.interpolate(csi_data, size=(114, 500), mode='bilinear', align_corners=False)
-
     
             keypoint = data['output']
             xy_keypoint = keypoint[:,:,0:2].to(device)
