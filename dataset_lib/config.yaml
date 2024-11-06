@@ -60,9 +60,9 @@ split_to_use: random_split
 
 init_rand_seed: 0
 train_loader:
-  batch_size: 256
-val_loader:
   batch_size: 32
+val_loader:
+  batch_size: 8
 test_loader:
-  batch_size: 2
+  batch_size: 1
 output_folder: ./ckpt/

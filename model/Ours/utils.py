@@ -152,7 +152,7 @@ def apply_bit_error(tensor: torch.Tensor, error_rate: float) -> torch.Tensor:
     :param error_rate: Tỉ lệ lỗi bit (0 đến 1).
     :return: Tensor với lỗi bit đã được mô phỏng.
     """
-    assert tensor.size(0) == 14336, "Tensor phải có kích thước 14336."
+    #assert tensor.size(0) == 14336, "Tensor phải có kích thước 14336."
     
     # Tạo một bản sao của tensor để không làm thay đổi tensor gốc
     modified_tensor = tensor.clone()
@@ -166,7 +166,7 @@ def apply_bit_error(tensor: torch.Tensor, error_rate: float) -> torch.Tensor:
     # Lật các bit tại các chỉ số đã chọn
     modified_tensor[indices_to_modify] ^= 1  # Đảo bit
 
-    return modified_tensor
+    return modified_tensor.to(tensor.device)
 
 def apply_bit_loss(tensor: torch.Tensor, loss_rate: float) -> torch.Tensor:
     """
@@ -176,7 +176,7 @@ def apply_bit_loss(tensor: torch.Tensor, loss_rate: float) -> torch.Tensor:
     :param loss_rate: Tỉ lệ mất bit (0 đến 1).
     :return: Tensor với mất bit đã được mô phỏng.
     """
-    assert tensor.size(0) == 14336, "Tensor phải có kích thước 14336."
+    #assert tensor.size(0) == 14336, "Tensor phải có kích thước 14336."
     
     # Xác định số lượng bit cần loại bỏ
     num_bits_to_remove = int(loss_rate * tensor.size(0))

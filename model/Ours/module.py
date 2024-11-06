@@ -211,3 +211,40 @@ class SKNet(nn.Module):
         #fea = self.stage_4(fea)
         
         return fea
+    
+class TamingStyleTransformer(nn.Module):
+    def __init__(self, window_size,num_embeddings, embed_dim=32, nhead=2, num_layers=2):
+        super(TamingStyleTransformer, self).__init__()
+        self.window_size = window_size
+        self.embedding = nn.Embedding(num_embeddings, embed_dim)  # Codebook size as num_embeddings
+        self.positional_encoding = nn.Parameter(torch.zeros(1, window_size, embed_dim))
+        
+        # Transformer block inspired by Taming Transformers
+        transformer_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=nhead, batch_first=True)
+        self.transformer = nn.TransformerEncoder(transformer_layer, num_layers=num_layers, enable_nested_tensor=True)
+        
+        self.fc_out = nn.Linear(embed_dim, num_embeddings)  # Predict next index
+
+    def forward(self, sequence):
+        b, seq_len = sequence.size()
+        corrected_sequence = sequence.clone()  # Start with the original sequence as a baseline
+
+        # Sliding window approach for iterative correction
+        for i in range(seq_len - self.window_size + 1):  # Ensure we cover full length
+            # Extract the current sliding window
+            window = corrected_sequence[:, i:i + self.window_size]  # Shape: [b, window_size]
+            
+            # Embed the window and add positional encoding
+            x = self.embedding(window) + self.positional_encoding  # Shape: [b, window_size, embed_dim]
+            
+            # Pass through transformer layers
+            x = self.transformer(x)  # Shape: [b, window_size, embed_dim]
+            
+            # Predict the next index (n+1)
+            next_index_logits = self.fc_out(x[:, -1, :])  # Use last element in window
+            next_index_pred = next_index_logits.argmax(dim=-1)  # Shape: [b]
+            
+            # Update the corrected sequence with the predicted index
+            corrected_sequence[:, i + self.window_size - 1] = next_index_pred
+
+        return corrected_sequence
