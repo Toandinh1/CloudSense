@@ -213,7 +213,7 @@ class SKNet(nn.Module):
         return fea
     
 class TamingStyleTransformer(nn.Module):
-    def __init__(self, window_size, num_embeddings, embed_dim=32, nhead=2, num_layers=2):
+    def __init__(self, window_size,num_embeddings, embed_dim=32, nhead=2, num_layers=2):
         super(TamingStyleTransformer, self).__init__()
         self.window_size = window_size
         self.embedding = nn.Embedding(num_embeddings, embed_dim)  # Codebook size as num_embeddings
@@ -221,7 +221,7 @@ class TamingStyleTransformer(nn.Module):
         
         # Transformer block inspired by Taming Transformers
         transformer_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=nhead, batch_first=True)
-        self.transformer = nn.TransformerEncoder(transformer_layer, num_layers=num_layers)
+        self.transformer = nn.TransformerEncoder(transformer_layer, num_layers=num_layers, enable_nested_tensor=True)
         
         self.fc_out = nn.Linear(embed_dim, num_embeddings)  # Predict next index
 
@@ -229,18 +229,10 @@ class TamingStyleTransformer(nn.Module):
         b, seq_len = sequence.size()
         corrected_sequence = sequence.clone()  # Start with the original sequence as a baseline
 
-        # Ensure sequence contains valid indices for embedding
-        if sequence.min() < 0 or sequence.max() >= self.embedding.num_embeddings:
-            raise ValueError(f"Embedding indices are out of range. Min: {sequence.min()}, Max: {sequence.max()}")
-
         # Sliding window approach for iterative correction
         for i in range(seq_len - self.window_size + 1):  # Ensure we cover full length
             # Extract the current sliding window
             window = corrected_sequence[:, i:i + self.window_size]  # Shape: [b, window_size]
-            
-            # Ensure all indices in the window are within valid range
-            if window.min() < 0 or window.max() >= self.embedding.num_embeddings:
-                raise ValueError(f"Embedding indices are out of range in window. Min: {window.min()}, Max: {window.max()}")
             
             # Embed the window and add positional encoding
             x = self.embedding(window) + self.positional_encoding  # Shape: [b, window_size, embed_dim]
@@ -248,7 +240,7 @@ class TamingStyleTransformer(nn.Module):
             # Pass through transformer layers
             x = self.transformer(x)  # Shape: [b, window_size, embed_dim]
             
-            # Predict the next index (n+1) using the last element in the window
+            # Predict the next index (n+1)
             next_index_logits = self.fc_out(x[:, -1, :])  # Use last element in window
             next_index_pred = next_index_logits.argmax(dim=-1)  # Shape: [b]
             

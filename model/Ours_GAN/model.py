@@ -23,7 +23,6 @@ class Quantizer(nn.Module):
 
     def forward(self, z):
         # Flatten z to match the embedding dimension
-        # print(z.shape)
         batch = z.shape[0]
         z_flat = z.view(-1, self.embedding_dim)
 
@@ -320,9 +319,7 @@ class CloudSense(nn.Module):
             input_dim=embedding_dim * 28 * 2, output_dim=34, hidden_dim=32
         )
         self._decoder = Decoder()
-        self.vq = Quantizer(
-            latent_dim=embedding_dim, num_embeddings=config["initial_cook_size"]
-        )
+        self.vq = Quantizer(latent_dim=embedding_dim, num_embeddings=config["initial_cook_size"])
         self.embedding_dim = embedding_dim
         self.commitment_cost = commitment_cost
 
@@ -340,8 +337,6 @@ class CloudSense(nn.Module):
                 self.min_codebook_size,
                 self.vq.num_embeddings - self.change_step,
             )
-        else:
-            new_codebook_size = self.vq.num_embeddings
         # else:  # If loss did not improve
         #     new_codebook_size = min(self.max_codebook_size, self.vq.num_embeddings + self.change_step)
 
@@ -370,8 +365,6 @@ class CloudSense(nn.Module):
                 noisy_indices = apply_bit_loss(
                     indices.cpu(), loss_rate=error_rate
                 )
-            else:
-                noisy_indices = indices
         else:
             if self.unreliable_mode == 0:
                 noisy_indices = apply_bit_error(
@@ -384,8 +377,7 @@ class CloudSense(nn.Module):
             else:
                 noisy_indices = indices
 
-        noisy_indices = noisy_indices.cuda()
-        correct_indices = self.recieved_indice_corrector(noisy_indices)
+        correct_indices = self.recieved_indice_corrector(noisy_indices.cuda())
         # print(correct_indices.dtype, indices.dtype)
         mask = (correct_indices == indices).float()
         accuracy_loss = 1 - mask.mean()
