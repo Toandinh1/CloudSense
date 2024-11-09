@@ -106,7 +106,7 @@ experiment_config = {
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1e-5,
-                "epoch": 50,
+                "epoch": 20,
                 "unreliable_mode": 0,  # 0: bit error   #1: bit loss
             },
         },
@@ -114,6 +114,5 @@ experiment_config = {
 }
 
 skip_pipeline = [
-    "Ours",
-    "Our_GAN",
+    "RSCNet", "EfficientFi", "CSINet", "LASSO", "DeepCMC", "Ours"
 ]

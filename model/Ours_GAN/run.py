@@ -52,8 +52,6 @@ def main_CloudSenseGAN(
             total_loss = 0
             for idx, data in enumerate(data_loader["train"]):
                 torch.cuda.empty_cache()
-                torch.cuda.empty_cache()
-                optimizer.zero_grad()
                 optimizer_GAN.zero_grad()
                 csi_data = data["input_wifi-csi"]
                 csi_data = csi_data.clone().detach().to(device)
@@ -74,10 +72,51 @@ def main_CloudSenseGAN(
                 ones_label = torch.ones(bs, 1).to(device)
                 output_real = dis(csi_data)[0]
                 errD_real = criterion_dis(output_real, ones_label)
-
+                errD_real.backward(retain_graph=True)
                 zeros_label = torch.zeros(bs, 1).to(device)
                 output_fake = dis(reconstructed_csi)[0]
                 errD_fake = criterion_dis(output_fake, zeros_label)
+                errD_fake.backward(retain_graph=True)
+                epsilon = 0.1
+                num_iterations = 1
+                alpha = epsilon / num_iterations
+                csi_data.requires_grad = True
+                for _ in range(num_iterations):
+                    # Forward pass
+                    outputs = model(csi_data)[3]
+                    optimizer.zero_grad()
+
+                    # Calculate the loss
+                    # loss = criterion2(torch.mul(confidence, outputs), torch.mul(confidence, xy_keypoint)) / 32
+                    loss = NMSELoss(csi_data, outputs)
+
+                    # Zero all existing gradients
+
+                    # Calculate gradients of model in backward pass
+                    loss.backward(retain_graph=True)
+
+                    # Collect datagrad
+                    data_grad = csi_data.grad.data
+
+                    # Collect the element-wise sign of the data gradient
+                    sign_data_grad = data_grad.sign()
+
+                    # Create the perturbed image by adjusting each pixel of the input image
+
+                    perturbed_csi_data = csi_data + alpha * sign_data_grad
+
+                    # Clip the perturbation to ensure it stays within the epsilon ball
+                    # perturbed_csi_data = torch.clamp(perturbed_csi_data, 0, 1)
+
+                    # Update the input for the next iteration
+                    csi_data.data = (
+                        perturbed_csi_data.detach().clone().requires_grad_(True)
+                    )
+                adv_csi = model(perturbed_csi_data)[3]
+                zeros_label = torch.zeros(bs, 1).to(device)
+                output_adv = dis(adv_csi)[0]
+                errD_adv = criterion_dis(output_adv, zeros_label)
+                errD_adv.backward(retain_graph=True)
 
                 hpe_loss = (
                     criterion_L2(
@@ -86,8 +125,10 @@ def main_CloudSenseGAN(
                     )
                     / 32
                 )
-                loss = correct_loss + vq_loss + errD_fake + errD_real + hpe_loss
-                loss.backward()
+                rec_loss = criterion_L2(reconstructed_csi, csi_data) 
+
+                loss = correct_loss+ vq_loss+ rec_loss+ hpe_loss
+                loss.backward(retain_graph=True)
                 total_loss += loss.item()
                 optimizer.step()
                 optimizer_GAN.step()

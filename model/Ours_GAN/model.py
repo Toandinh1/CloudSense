@@ -91,7 +91,7 @@ class regression(nn.Module):
 class Decoder(nn.Module):
     def __init__(self):
         super(Decoder, self).__init__()
-        self.transposed_conv1 = nn.ConvTranspose2d(in_channels=32, out_channels=128, kernel_size=3, stride=2, padding=1, output_padding=1)
+        self.transposed_conv1 = nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=3, stride=2, padding=1, output_padding=1)
         self.transposed_conv2 = nn.ConvTranspose2d(in_channels=128, out_channels=32, kernel_size=3, stride=2, padding=1, output_padding=1)
         self.transposed_conv3 = nn.ConvTranspose2d(in_channels=32, out_channels=3, kernel_size=3, stride=2, padding=1, output_padding=1)
         self.relu = nn.ReLU()

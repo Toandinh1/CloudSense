@@ -10,15 +10,20 @@ import torch
 from torch import nn
 
 
-class NMSELoss(nn.Module):
-    def __init__(self):
-        super(NMSELoss, self).__init__()
+def NMSELoss(input, target):
+    
+    # Calculate squared error
+    squared_error = (input - target) ** 2
+        
+    # Calculate mean squared error
+    mse = torch.mean(squared_error)
 
-    def forward(self, original, recovered):
-        loss = torch.mean(torch.square(original - recovered)) / torch.sum(
-            torch.square(original)
-        )
-        return loss
+    # Calculate normalized mean squared error
+    # Divide mean squared error by the variance of the target
+    # This helps in normalizing the loss across different scales of the target
+    nmse = mse / torch.var(target)
+
+    return nmse
 
 
 def nmse(x, x_hat):
