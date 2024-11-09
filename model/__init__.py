@@ -12,3 +12,4 @@ from .CSINet import main_CSINet
 from .LASSO import main_LASSO
 from .BM3D_AMP import main_DeepCMC
 from .Ours import main_CloudSense
+from .Ours_GAN import main_CloudSenseGAN

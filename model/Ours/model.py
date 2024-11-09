@@ -9,43 +9,23 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from sklearn.cluster import KMeans
+from vector_quantize_pytorch import ResidualVQ, VectorQuantize
 
 from .module import SKUnit, TamingStyleTransformer
 from .utils import apply_bit_error, apply_bit_loss
 
 
-class Quantizer(nn.Module):
-    def __init__(self, latent_dim, num_embeddings):
-        super(Quantizer, self).__init__()
-        self.num_embeddings = num_embeddings
-        self.embedding_dim = latent_dim
-        self.embedding = nn.Parameter(torch.randn(num_embeddings, latent_dim))
-
-    def forward(self, z):
-        # Flatten z to match the embedding dimension
-        # print(z.shape)
-        batch = z.shape[0]
-        z_flat = z.view(-1, self.embedding_dim)
-
-        # Calculate distances between z and the embeddings in the codebook
-        distances = (
-            z_flat.pow(2).sum(1, keepdim=True)
-            - 2 * z_flat @ self.embedding.t()
-            + self.embedding.pow(2).sum(1)
+class Quantizer(VectorQuantize):
+    def __init__(self, latent_dim, codebook_size, commit_cost):
+        # Gọi constructor của lớp cha VectorQuantize
+        super(Quantizer, self).__init__(
+            dim=latent_dim,
+            codebook_size=codebook_size,
+            commitment_weight=commit_cost,
         )
 
-        # Get the closest embedding indices
-        indices = distances.argmin(1)
-
-        # Reshape indices to keep the original batch and spatial dimensions
-        indices = indices.view(batch, -1)  # Shape: (batch, height, width)
-
-        # Quantize z by replacing each vector with its closest codebook vector
-        z_quantized = self.embedding[indices].view_as(z)
-
-        return z_quantized, indices
-
     def update_codebook(self, z, new_num_embeddings):
+        # Nếu số lượng embeddings cần thay đổi, cập nhật lại codebook
         if new_num_embeddings != self.num_embeddings:
             self.num_embeddings = new_num_embeddings
             self.embedding = nn.Parameter(
@@ -54,6 +34,7 @@ class Quantizer(nn.Module):
                 )
             )
 
+        # Làm phẳng z và thực hiện KMeans clustering để cập nhật embeddings
         z_flat = z.view(-1, self.embedding_dim).detach().cpu().numpy()
         kmeans = KMeans(n_clusters=self.num_embeddings, random_state=0).fit(
             z_flat
@@ -64,18 +45,39 @@ class Quantizer(nn.Module):
         self.embedding.data = new_embeddings.to(self.embedding.device)
         print(f"\nCodebook updated: {self.num_embeddings} vectors in codebook")
 
+    def update_codebook_size(self, new_size):
+        """
+        Cập nhật kích thước của codebook (số embeddings).
+
+        Tham số:
+        - new_size (int): Kích thước mới của codebook.
+        """
+        # Kiểm tra nếu cần cập nhật
+        if new_size != self.num_embeddings:
+            self.num_embeddings = new_size
+            self.embedding = nn.Parameter(
+                torch.randn(self.num_embeddings, self.embedding_dim).to(
+                    self.embedding.device
+                )
+            )
+            print(f"Codebook size updated to {self.num_embeddings} embeddings.")
+        else:
+            print(
+                "New size is the same as current codebook size. No update needed."
+            )
+
     def decode(self, indices, shape):
         """
-        Decode from indices to reconstruct the quantized tensor.
+        Giải mã từ các indices để tái tạo lại tensor đã được lượng tử hóa.
 
-        Parameters:
-        indices (torch.Tensor): The indices tensor from the quantizer.
-        shape (tuple): The shape of the original input tensor.
+        Tham số:
+        - indices (torch.Tensor): Tensor chứa các chỉ số từ Quantizer.
+        - shape (tuple): Kích thước của tensor đầu vào ban đầu.
 
-        Returns:
-        torch.Tensor: The reconstructed tensor from the codebook indices.
+        Trả về:
+        - torch.Tensor: Tensor đã được tái tạo từ codebook indices.
         """
-        # Use the codebook embeddings to map indices back to the quantized vectors
+        # Tái tạo z bằng cách ánh xạ indices trở lại các vector trong codebook
         z_reconstructed = self.embedding[indices].view(shape)
         return z_reconstructed
 
@@ -86,7 +88,7 @@ class Encoder(nn.Module):
         self.SKunit1 = SKUnit(
             in_features=3,
             mid_features=16,
-            out_features=32,
+            out_features=16,
             dim1=114,
             dim2=10,
             pool_dim="freq-chan",
@@ -97,24 +99,11 @@ class Encoder(nn.Module):
             L=32,
         )
         self.SKunit2 = SKUnit(
-            in_features=32,
-            mid_features=64,
-            out_features=128,
+            in_features=16,
+            mid_features=32,
+            out_features=32,
             dim1=57,
             dim2=8,
-            pool_dim="freq-chan",
-            M=1,
-            G=64,
-            r=4,
-            stride=1,
-            L=32,
-        )
-        self.SKunit3 = SKUnit(
-            in_features=128,
-            mid_features=64,
-            out_features=32,
-            dim1=28,
-            dim2=2,
             pool_dim="freq-chan",
             M=1,
             G=64,
@@ -131,7 +120,6 @@ class Encoder(nn.Module):
         pool_1_output = self.pool_1(encoder_1_output)
         encoder_2_output = self.SKunit2(pool_1_output)
         encoder_output = self.pool_2(encoder_2_output)
-        encoder_output = self.SKunit3(encoder_output)
 
         return encoder_output
 
@@ -320,8 +308,11 @@ class CloudSense(nn.Module):
             input_dim=embedding_dim * 28 * 2, output_dim=34, hidden_dim=32
         )
         self._decoder = Decoder()
-        self.vq = Quantizer(
-            latent_dim=embedding_dim, num_embeddings=config["initial_cook_size"]
+        self.vq = VectorQuantize(
+            dim=56,
+            codebook_size=config["initial_cook_size"],
+            commitment_weight=commitment_cost,
+            decay=0.8
         )
         self.embedding_dim = embedding_dim
         self.commitment_cost = commitment_cost
@@ -338,18 +329,25 @@ class CloudSense(nn.Module):
         if current_loss < self.prev_loss:  # If loss improved
             new_codebook_size = max(
                 self.min_codebook_size,
-                self.vq.num_embeddings - self.change_step,
+                self.vq.codebook_size - self.change_step,
             )
         else:
-            new_codebook_size = self.vq.num_embeddings
+            new_codebook_size = self.vq.codebook_size
         # else:  # If loss did not improve
         #     new_codebook_size = min(self.max_codebook_size, self.vq.num_embeddings + self.change_step)
 
-        if new_codebook_size != self.vq.num_embeddings:
-            self.vq.update_codebook(z, new_codebook_size)
+        if new_codebook_size != self.vq.codebook_size:
+            self.vq = VectorQuantize(
+                dim=56,
+                codebook_size=new_codebook_size,
+                commitment_weight=self.commitment_cost,
+                decay= 0.8
+            ).cuda()
             self.recieved_indice_corrector = TamingStyleTransformer(
                 window_size=9, num_embeddings=new_codebook_size
             ).cuda()
+            print(f"Codebook size updated to {new_codebook_size} vector.")
+
         self.prev_loss = current_loss
 
     def forward(self, x, is_test=False, error_rate=None):
@@ -358,14 +356,18 @@ class CloudSense(nn.Module):
         # Encode input
         z = self._encoder(x)
         z = self._pre_vq_conv(z)
-
+        z = z.view(batch, -1, 56)
         # Quantization
-        z_quantized, indices = self.vq(z)
+        z_quantized, indices, vq_loss = self.vq(z)
         if is_test:
             if self.unreliable_mode == 0:
                 noisy_indices = apply_bit_error(
-                    indices.cpu(), error_rate=error_rate
+                    indices.cpu(),
+                    error_rate=error_rate,
+                    num_embedding=self.vq.codebook_size,
                 )
+                # print(f"Noise index: {indices}")
+                # print(f"noisy index: {noisy_indices}")
             elif self.unreliable_mode == 1:
                 noisy_indices = apply_bit_loss(
                     indices.cpu(), loss_rate=error_rate
@@ -375,16 +377,17 @@ class CloudSense(nn.Module):
         else:
             if self.unreliable_mode == 0:
                 noisy_indices = apply_bit_error(
-                    indices.cpu(), error_rate=self.unrilable_rate_in_training
+                    indices.cpu(),
+                    error_rate=self.unrilable_rate_in_training,
+                    num_embedding=self.vq.codebook_size,
                 )
             elif self.unreliable_mode == 1:
-                noisy_indices = apply_bit_loss(
-                    indices.cpu(), loss_rate=self.unrilable_rate_in_training
-                )
+                noisy_indices = apply_bit_loss(indices.cpu(), loss_rate=0)
             else:
                 noisy_indices = indices
-
         noisy_indices = noisy_indices.cuda()
+        # correct_mask = (noisy_indices == indices).float()
+        # print(f"Check Error after transmiting: {torch.mean(correct_mask)}")
         correct_indices = self.recieved_indice_corrector(noisy_indices)
         # print(correct_indices.dtype, indices.dtype)
         mask = (correct_indices == indices).float()
@@ -393,9 +396,13 @@ class CloudSense(nn.Module):
             correct_indices.float(), indices.float()
         )
         correct_loss = (accuracy_loss + cross_entropy_loss) / 2
+        # print(f"Origin: {indices}")
+        # print(f"Noisy: {noisy_indices}")
         # Lưu toàn bộ tensor vào file văn bản
-        z_reconstructed = self.vq.decode(correct_indices, z.shape)
-
+        z_reconstructed = self.vq.get_codes_from_indices(correct_indices)
+        # print(f"Origin: {z_quantized[0,0,2:10]}")
+        # print(f"Noisy: {z_reconstructed[0,0,2:10]}")
+        # print(torch.mean(z_quantized - z_reconstructed))
         # print(F.mse_loss(z_quantized, z_reconstructed), noisy_indices.shape)
         # Reshape quantized vector for decoder and regression
         z_reconstructed = z_reconstructed.view(batch, self.embedding_dim, 28, 2)
@@ -406,19 +413,5 @@ class CloudSense(nn.Module):
 
         # Reshape regression output
         y_p = y_p.reshape(batch, 17, 2)
-
-        # Compute losses
-        reconstruction_loss = F.mse_loss(r_x, x)
-
-        # Commitment loss
-        commitment_loss = self.commitment_cost * F.mse_loss(
-            z, z_quantized.detach()
-        )
-
-        # Codebook loss (encourage embedding vectors to be close to quantized ones)
-        codebook_loss = F.mse_loss(z.detach(), z_quantized)
-
-        # Total loss
-        vq_loss = reconstruction_loss + commitment_loss + codebook_loss
 
         return correct_loss, vq_loss, z, r_x, y_p

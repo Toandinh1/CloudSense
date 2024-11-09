@@ -5,20 +5,30 @@ Created on Sat Oct 26 15:28:36 2024
 
 @author: jackson-devworks
 """
-import torch
 import numpy as np
+import torch
 from torch import nn
+
 
 class NMSELoss(nn.Module):
     def __init__(self):
-        super(NMSELoss,self).__init__()
-    
-    def forward(self,original,recovered):
-        loss = (torch.mean(torch.square(original-recovered))/torch.sum(torch.square(original)))
+        super(NMSELoss, self).__init__()
+
+    def forward(self, original, recovered):
+        loss = torch.mean(torch.square(original - recovered)) / torch.sum(
+            torch.square(original)
+        )
         return loss
-    
+
+
 def nmse(x, x_hat):
-    return 10 * torch.log10(torch.mean(torch.mean(torch.square(x-x_hat), dim=(1,2,3))/torch.mean(torch.square(x), dim=(1,2,3))))
+    return 10 * torch.log10(
+        torch.mean(
+            torch.mean(torch.square(x - x_hat), dim=(1, 2, 3))
+            / torch.mean(torch.square(x), dim=(1, 2, 3))
+        )
+    )
+
 
 def compute_pck_pckh(dt_kpts,gt_kpts,thr):
     """
@@ -36,8 +46,10 @@ def compute_pck_pckh(dt_kpts,gt_kpts,thr):
     kpts_num=gt.shape[2] #keypoints
     ped_num=gt.shape[0] #batch_size
     #compute dist
-    scale=np.sqrt(np.sum(np.square(gt[:,:,5]-gt[:,:,12]),1)) #right shoulder--left hip
+    scale=np.sqrt(np.sum(np.square(gt[:,:,1]-gt[:,:,11]),1)) #right shoulder--left hip
+    #dist=np.sqrt(np.sum(np.square(dt-gt),1))/np.tile(scale,(gt.shape[2],1)).T
     dist=np.sqrt(np.sum(np.square(dt-gt),1))/np.tile(scale,(gt.shape[2],1)).T
+    #dist=np.sqrt(np.sum(np.square(dt-gt),1))
     #compute pck
     pck = np.zeros(gt.shape[2]+1)
     for kpt_idx in range(kpts_num):
@@ -46,15 +58,49 @@ def compute_pck_pckh(dt_kpts,gt_kpts,thr):
     pck[17] = 100*np.mean(dist <= thr)
     return pck
 
+
+def compute_pck_pckh_18(dt_kpts, gt_kpts, thr):
+    """
+    pck指标计算
+    :param dt_kpts:算法检测输出的估计结果,shape=[n,h,w]=[行人数，２，关键点个数]
+    :param gt_kpts: groundtruth人工标记结果,shape=[n,h,w]
+    :param refer_kpts: 尺度因子，用于预测点与groundtruth的欧式距离的scale。
+    　　　　　　　　　　　pck指标：躯干直径，左肩点－右臀点的欧式距离；
+    　　　　　　　　　　　pckh指标：头部长度，头部rect的对角线欧式距离；
+    :return: 相关指标
+    """
+    dt = np.array(dt_kpts)
+    gt = np.array(gt_kpts)
+    assert dt.shape[0] == gt.shape[0]
+    kpts_num = gt.shape[2]  # keypoints
+    ped_num = gt.shape[0]  # batch_size
+    # compute dist
+    scale = np.sqrt(
+        np.sum(np.square(gt[:, :, 5] - gt[:, :, 8]), 1)
+    )  # right shoulder--left hip
+    dist = (
+        np.sqrt(np.sum(np.square(dt - gt), 1))
+        / np.tile(scale, (gt.shape[2], 1)).T
+    )
+    # dist=np.sqrt(np.sum(np.square(dt-gt),1))
+    # compute pck
+    pck = np.zeros(gt.shape[2] + 1)
+    for kpt_idx in range(kpts_num):
+        pck[kpt_idx] = 100 * np.mean(dist[:, kpt_idx] <= thr)
+        # compute average pck
+    pck[18] = 100 * np.mean(dist <= thr)
+    return pck
+
+
 def compute_similarity_transform(X, Y, compute_optimal_scale=False):
     """
     A port of MATLAB's `procrustes` function to Numpy.
-    
+
     Args:
         X: array NxM of targets, with N number of points and M point dimensionality
         Y: array NxM of inputs
         compute_optimal_scale: whether we compute optimal scale or force it to be 1
-        
+
     Returns:
         d: squared error after transformation
         Z: transformed Y
@@ -68,8 +114,8 @@ def compute_similarity_transform(X, Y, compute_optimal_scale=False):
     X0 = X - muX
     Y0 = Y - muY
 
-    ssX = (X0**2.).sum()
-    ssY = (Y0**2.).sum()
+    ssX = (X0**2.0).sum()
+    ssY = (Y0**2.0).sum()
 
     normX = np.sqrt(ssX)
     normY = np.sqrt(ssY)
@@ -103,6 +149,7 @@ def compute_similarity_transform(X, Y, compute_optimal_scale=False):
 
     return d, Z, T, b, c
 
+
 def calulate_error(predicted_keypoints, ground_truth_keypoints):
     """
     Compute MPJPE and PA-MPJPE given predictions and ground-truths.
@@ -116,13 +163,21 @@ def calulate_error(predicted_keypoints, ground_truth_keypoints):
     ground_truth_keypoints = np.array(ground_truth_keypoints.detach().numpy())
 
     # Validate input shapes
-    assert predicted_keypoints.shape == ground_truth_keypoints.shape, "Input shapes must match"
+    assert (
+        predicted_keypoints.shape == ground_truth_keypoints.shape
+    ), "Input shapes must match"
 
     N = predicted_keypoints.shape[0]  # Number of samples
     num_joints = predicted_keypoints.shape[2]  # Number of keypoints
 
     # Calculate MPJPE
-    mpjpe = np.mean(np.sqrt(np.sum(np.square(predicted_keypoints - ground_truth_keypoints), axis=2)))
+    mpjpe = np.mean(
+        np.sqrt(
+            np.sum(
+                np.square(predicted_keypoints - ground_truth_keypoints), axis=2
+            )
+        )
+    )
 
     # Calculate PA-MPJPE
     pampjpe = np.zeros(N)
@@ -132,11 +187,17 @@ def calulate_error(predicted_keypoints, ground_truth_keypoints):
         frame_gt = ground_truth_keypoints[n]  # Shape [h, w]
 
         # Compute similarity transform
-        _, Z, T, b, c = compute_similarity_transform(frame_gt, frame_pred, compute_optimal_scale=True)
+        _, Z, T, b, c = compute_similarity_transform(
+            frame_gt, frame_pred, compute_optimal_scale=True
+        )
 
         # Apply the transformation to predictions
         frame_pred_transformed = (b * frame_pred @ T) + c
-        pampjpe[n] = np.mean(np.sqrt(np.sum(np.square(frame_pred_transformed - frame_gt), axis=1)))
+        pampjpe[n] = np.mean(
+            np.sqrt(
+                np.sum(np.square(frame_pred_transformed - frame_gt), axis=1)
+            )
+        )
 
     # Compute average PA-MPJPE
     pampjpe = np.mean(pampjpe)

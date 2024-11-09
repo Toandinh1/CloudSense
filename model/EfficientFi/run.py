@@ -14,14 +14,15 @@ import os
 from .model import EfficientFi
 from .utils import nmse, calulate_error, compute_pck_pckh, NMSELoss
 
-#2.85, 34.2, 85.5
-compress_rate_list = [67, 148, 334, 763, 1781]
+
+compress_rate_list = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
 
 def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, check_compression_rate=False):
     for k in compress_rate_list:
         torch.cuda.empty_cache()
         print(f"with compress rate {k}: ")
         check_compression_rate = True
+        model_config["num_embeddings"] = k
         checkpoint_folder = os.path.join(all_checkpoint_folder, str(k))
         os.makedirs(checkpoint_folder, exist_ok=True)
         model = EfficientFi(model_config, k).to(device)
@@ -105,10 +106,10 @@ def main_EfficientFi(data_loader, model_config, device, all_checkpoint_folder, c
                    #print('saving the model at the end of epoch %d with pck_50: %.3f' % (epoch_index, pck_50_overall))
                    torch.save(model, os.path.join(checkpoint_folder, "best.pt"))
                    pck_50_overall_max = pck_50_overall
-                   print(f"\nBest Epoch in epoch {epoch} with {pck_50_overall_max}")
+                message = f"\nBest Epoch in epoch {epoch} with PCK50: {pck_50_overall_max}, PCK20: {pck_20_overall}"
                 torch.save(model, os.path.join(checkpoint_folder, "last.pt"))
             scheduler.step()
-        
+        print(message)
         model = torch.load(os.path.join(checkpoint_folder, "last.pt"), weights_only=False)
         metric = []
         avg_nmse = []

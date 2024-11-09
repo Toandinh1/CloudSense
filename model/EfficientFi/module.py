@@ -57,54 +57,64 @@ class Quantize(nn.Module):
 
 class Encoder(nn.Module):
     def __init__(self):
-        super(Encoder,self).__init__()
+        super(Encoder, self).__init__()
         self.encoder_1 = nn.Sequential(
-            #input size: (3,114,500)
-            nn.Conv2d(3,32,(15,23),stride=9),
+            # Input size: (3, 114, 10)
+            nn.Conv2d(3, 32, kernel_size=(7, 3), stride=(3, 1), padding=(3, 1)),
             nn.ReLU(inplace=False),
-            nn.Conv2d(32,32,(3,7),stride=1),
+            nn.Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=1),
             nn.ReLU(inplace=False)
-            #output size: (32,10,48)
+            # Output size after these convolutions: (32, 38, 10)
         )
-        self.pool_1 = nn.MaxPool2d((1,2),stride=(1,2),return_indices=True)
-        # output size: (32,10,24)
+        self.pool_1 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2), return_indices=True)
+        # Output size after pooling: (32, 19, 5)
+        
         self.encoder_2 = nn.Sequential(
-            #input size: (32,10,24)
-            nn.Conv2d(32,64,(3,7),stride=1),
+            # Input size: (32, 19, 5)
+            nn.Conv2d(32, 64, kernel_size=(5, 3), stride=(2, 1), padding=(2, 1)),
             nn.ReLU(inplace=False),
-            nn.Conv2d(64,96,(3,7),stride=1),
+            nn.Conv2d(64, 96, kernel_size=(3, 3), stride=(1, 1), padding=1),
             nn.ReLU(inplace=False)
-            #output size: (128,96,6,12)
+            # Output size after these convolutions: (96, 10, 5)
         )
-        self.pool_2 = nn.MaxPool2d((1,2),stride=(1,2),return_indices=True)
-        # output size: (128,96,6,6)
-    def forward(self,x):
-        encoder_1_output = self.encoder_1(x)
-        pool_1_output,indices1 = self.pool_1(encoder_1_output)
-        encoder_2_output = self.encoder_2(pool_1_output)
-        encoder_output,indices2 = self.pool_2(encoder_2_output)
-        return encoder_output, indices1, indices2
+        self.pool_2 = nn.MaxPool2d(kernel_size=(2, 1), stride=(2, 1), return_indices=True)
+        # Output size after pooling: (96, 5, 5)
+    def forward(self, x):
+        encoder_1_output = self.encoder_1(x)  # Output: (b, 32, 38, 10)
+        pool_1_output, indices1 = self.pool_1(encoder_1_output)  # Output: (b, 32, 19, 5)
+        encoder_2_output = self.encoder_2(pool_1_output)  # Output: (b, 96, 10, 5)
+        pool_2_output, indices2 = self.pool_2(encoder_2_output)  # Output: (b, 96, 5, 5)
+        return pool_2_output, indices1, indices2
 
 class Decoder(nn.Module):
     def __init__(self):
-        super(Decoder,self).__init__()
-        self.unpool_2 = nn.MaxUnpool2d((1,2),stride=(1,2))
+        super(Decoder, self).__init__()
+        self.unpool_2 = nn.MaxUnpool2d(kernel_size=(2, 1), stride=(2, 1))  # For max pooling output (b, 96, 5, 5)
         self.decoder_2 = nn.Sequential(
-            nn.ConvTranspose2d(96,64,(3,7),stride=1),
+            nn.ConvTranspose2d(96, 64, kernel_size=(3, 3), stride=(1, 1), padding=1),  # (b, 64, 5, 5)
             nn.ReLU(inplace=False),
-            nn.ConvTranspose2d(64,32,(3,7),stride=1)
+            nn.ConvTranspose2d(64, 32, kernel_size=(5, 3), stride=(2, 1), padding=(2, 1)),  # (b, 32, 10, 5)
+            nn.ReLU(inplace=False)  # (b, 32, 10, 5)
         )
-        self.unpool_1 = nn.MaxUnpool2d((1,2),stride=(1,2))
+        self.unpool_1 = nn.MaxUnpool2d(kernel_size=(2, 2), stride=(2, 2))  # For max pooling output (b, 32, 10, 5)
         self.decoder_1 = nn.Sequential(
-            nn.ConvTranspose2d(32,32,(3,7),stride=1),
+            nn.ConvTranspose2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=1),  # (b, 32, 10, 5)
             nn.ReLU(inplace=False),
-            nn.ConvTranspose2d(32,3,(15,23),stride=9)
+            nn.ConvTranspose2d(32, 3, kernel_size=(7, 3), stride=(3, 1), padding=(3, 1))  # Output: (b, 3, 114, 10)
         )
-    def forward(self, x, indices2, indices1):
-        r_x = self.unpool_2(x,indices2)
-        r_x = self.decoder_2(r_x)
-        r_x = self.unpool_1(r_x,indices1)
-        r_x = self.decoder_1(r_x)
+    def forward(self, x: torch.Tensor, indices2: torch.Tensor, indices1: torch.Tensor) -> torch.Tensor:
+        # Unpooling from decoder 2
+        r_x = self.unpool_2(x, indices2)  # Unpooling with indices
+        r_x = self.decoder_2(r_x)  # Output size should be (b, 32, 10, 5)
+        # Adjust the output size for unpool_1 based on the expected output dimensions
+        output_size_unpool_1 = (r_x.size(0), 32, 38, 10)  # Batch size, channels, height, width
+        r_x = self.unpool_1(r_x, indices1, output_size=output_size_unpool_1)  # Correct output size
+        r_x = self.decoder_1(r_x)  # Final output should be (b, 3, 114, 10)
+        
+        # To ensure the output size is correct, you can check and adjust the final layer
+        if r_x.size(2) != 114:
+            r_x = F.interpolate(r_x, size=(114, 10), mode='bilinear', align_corners=False)
+        
         return r_x
 
 class HumanPoseEstimator(nn.Module):
