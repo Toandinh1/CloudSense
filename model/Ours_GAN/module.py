@@ -11,8 +11,20 @@ from torch import nn
 
 
 class SKConv(nn.Module):
-    def __init__(self, input_dim, output_dim, dim1, dim2, pool_dim,  M=4, G=1, r=4, stride=1 ,L=32):
-        """ Constructor
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        dim1,
+        dim2,
+        pool_dim,
+        M=4,
+        G=1,
+        r=4,
+        stride=1,
+        L=32,
+    ):
+        """Constructor
         Args:
             features: input channel dimensionality.
             M: the number of branchs.
@@ -23,58 +35,84 @@ class SKConv(nn.Module):
         """
         super(SKConv, self).__init__()
 
-        hidden_dim = int(input_dim/r)
+        hidden_dim = int(input_dim / r)
         self.dim1 = dim1
         self.dim2 = dim2
         self.output_dim = output_dim
         self.M = M
-        #self.features = features
+        # self.features = features
         self.pool_dim = pool_dim
         self.convs = nn.ModuleList([])
         for i in range(M):
-            self.convs.append(nn.Sequential(
-                nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=stride, padding=1+i, dilation=1+i, groups=G, bias=False),
-                nn.BatchNorm2d(output_dim),
-                nn.ReLU(inplace=True)
-            ))
-        self.gap = nn.AdaptiveAvgPool2d((1,1))
+            self.convs.append(
+                nn.Sequential(
+                    nn.Conv2d(
+                        input_dim,
+                        output_dim,
+                        kernel_size=3,
+                        stride=stride,
+                        padding=1 + i,
+                        dilation=1 + i,
+                        groups=G,
+                        bias=False,
+                    ),
+                    nn.BatchNorm2d(output_dim),
+                    nn.ReLU(inplace=True),
+                )
+            )
+        self.gap = nn.AdaptiveAvgPool2d((1, 1))
 
+        if pool_dim == "freq":
+            d = int(dim1 / r)
+            self.fc = nn.Sequential(
+                nn.Linear(dim1, d), nn.BatchNorm1d(d), nn.ReLU(inplace=True)
+            )
+            self.fcs = nn.ModuleList([])
+            for i in range(M):
+                self.fcs.append(
+                    nn.Conv1d(
+                        in_channels=d,
+                        out_channels=dim1,
+                        kernel_size=1,
+                        stride=1,
+                    )
+                )
 
-        if pool_dim == 'freq':
-           d = int(dim1/r)
-           self.fc = nn.Sequential(nn.Linear(dim1, d),
-                                nn.BatchNorm1d(d),
-                                nn.ReLU(inplace=True))
-           self.fcs = nn.ModuleList([])
-           for i in range(M):
-               self.fcs.append(
-                 nn.Conv1d(in_channels= d, out_channels=dim1, kernel_size=1, stride=1)
-                 )
+        elif pool_dim == "freq-time":
+            d = int(dim1 * dim2 / r)
+            self.fc = nn.Sequential(
+                nn.Linear(dim1 * dim2, d),
+                nn.BatchNorm1d(d),
+                nn.ReLU(inplace=True),
+            )
+            self.fcs = nn.ModuleList([])
+            for i in range(M):
+                self.fcs.append(
+                    nn.Conv1d(
+                        in_channels=d,
+                        out_channels=dim1 * dim2,
+                        kernel_size=1,
+                        stride=1,
+                    )
+                )
 
-        elif pool_dim == 'freq-time':
-           d = int(dim1*dim2/r)
-           self.fc = nn.Sequential(nn.Linear(dim1*dim2, d),
-                                nn.BatchNorm1d(d),
-                                nn.ReLU(inplace=True))
-           self.fcs = nn.ModuleList([])
-           for i in range(M):
-               self.fcs.append(
-                 nn.Conv1d(in_channels= d, out_channels=dim1*dim2, kernel_size=1, stride=1)
-                 )
-
-        elif pool_dim == 'freq-chan':
-           d = int(output_dim/r)
-           self.fc = nn.Sequential(nn.Conv1d(output_dim, d ,kernel_size=1, stride=1),
-                                nn.BatchNorm1d(d),
-                                nn.ReLU(inplace=True))
-           self.fcs = nn.ModuleList([])
-           for i in range(M):
-               self.fcs.append(
-                 nn.Conv1d(in_channels= d, out_channels=output_dim, kernel_size=1, stride=1)
-                 )
-
-
-
+        elif pool_dim == "freq-chan":
+            d = int(output_dim / r)
+            self.fc = nn.Sequential(
+                nn.Conv1d(output_dim, d, kernel_size=1, stride=1),
+                nn.BatchNorm1d(d),
+                nn.ReLU(inplace=True),
+            )
+            self.fcs = nn.ModuleList([])
+            for i in range(M):
+                self.fcs.append(
+                    nn.Conv1d(
+                        in_channels=d,
+                        out_channels=output_dim,
+                        kernel_size=1,
+                        stride=1,
+                    )
+                )
 
         self.softmax = nn.Softmax(dim=1)
 
@@ -84,44 +122,74 @@ class SKConv(nn.Module):
 
         feats = [conv(x) for conv in self.convs]
         feats = torch.cat(feats, dim=1)
-        feats = feats.view(batch_size, self.M, feats.shape[2],self.output_dim, feats.shape[3])
+        feats = feats.view(
+            batch_size, self.M, feats.shape[2], self.output_dim, feats.shape[3]
+        )
 
         feats_U = torch.sum(feats, dim=1)
 
-        if self.pool_dim == 'freq' :
-          feats_S = torch.mean(feats_U,dim=[2,3])
-          feats_S = feats_S.view(batch_size, feats_S.shape[1])
-          feats_Z = self.fc(feats_S).unsqueeze(2)
-          attention_vectors = [fc(feats_Z) for fc in self.fcs]
-          attention_vectors = torch.cat(attention_vectors, dim=1)
-          attention_vectors = attention_vectors.view(batch_size, self.M, self.dim1, 1, 1)
-          attention_vectors = self.softmax(attention_vectors)
-        elif self.pool_dim == 'freq-time':
-          feats_S = torch.mean(feats_U, dim =2)
-          feats_S = feats_S.view(batch_size,feats_S.shape[1]*feats_S.shape[2])
-          feats_Z = self.fc(feats_S).unsqueeze(2)
-          attention_vectors = [fc(feats_Z) for fc in self.fcs]
-          attention_vectors = torch.cat(attention_vectors, dim=1)
-          attention_vectors = attention_vectors.view(batch_size, self.M, self.dim1*self.dim2, 1, 1)
-          attention_vectors = self.softmax(attention_vectors)
-          attention_vectors = attention_vectors.view(batch_size,self.M,self.dim1,1,self.dim2)
-        elif self.pool_dim == 'freq-chan':
-          feats_S = torch.mean(feats_U, dim = 3)
-          feats_S = feats_S.view(batch_size,feats_S.shape[2],feats_S.shape[1])
-          feats_Z = self.fc(feats_S)
-          attention_vectors = [fc(feats_Z) for fc in self.fcs]
-          attention_vectors = torch.cat(attention_vectors, dim=1)
-          attention_vectors = attention_vectors.view(batch_size, self.M,self.output_dim, self.dim1, 1)
-          attention_vectors = self.softmax(attention_vectors)
-          attention_vectors = attention_vectors.view(batch_size,self.M,self.dim1,self.output_dim,1)
+        if self.pool_dim == "freq":
+            feats_S = torch.mean(feats_U, dim=[2, 3])
+            feats_S = feats_S.view(batch_size, feats_S.shape[1])
+            feats_Z = self.fc(feats_S).unsqueeze(2)
+            attention_vectors = [fc(feats_Z) for fc in self.fcs]
+            attention_vectors = torch.cat(attention_vectors, dim=1)
+            attention_vectors = attention_vectors.view(
+                batch_size, self.M, self.dim1, 1, 1
+            )
+            attention_vectors = self.softmax(attention_vectors)
+        elif self.pool_dim == "freq-time":
+            feats_S = torch.mean(feats_U, dim=2)
+            feats_S = feats_S.view(
+                batch_size, feats_S.shape[1] * feats_S.shape[2]
+            )
+            feats_Z = self.fc(feats_S).unsqueeze(2)
+            attention_vectors = [fc(feats_Z) for fc in self.fcs]
+            attention_vectors = torch.cat(attention_vectors, dim=1)
+            attention_vectors = attention_vectors.view(
+                batch_size, self.M, self.dim1 * self.dim2, 1, 1
+            )
+            attention_vectors = self.softmax(attention_vectors)
+            attention_vectors = attention_vectors.view(
+                batch_size, self.M, self.dim1, 1, self.dim2
+            )
+        elif self.pool_dim == "freq-chan":
+            feats_S = torch.mean(feats_U, dim=3)
+            feats_S = feats_S.view(
+                batch_size, feats_S.shape[2], feats_S.shape[1]
+            )
+            feats_Z = self.fc(feats_S)
+            attention_vectors = [fc(feats_Z) for fc in self.fcs]
+            attention_vectors = torch.cat(attention_vectors, dim=1)
+            attention_vectors = attention_vectors.view(
+                batch_size, self.M, self.output_dim, self.dim1, 1
+            )
+            attention_vectors = self.softmax(attention_vectors)
+            attention_vectors = attention_vectors.view(
+                batch_size, self.M, self.dim1, self.output_dim, 1
+            )
 
-        feats_V = torch.sum(feats*attention_vectors, dim=1)
-        feats_V = torch.transpose(feats_V,1,2)
+        feats_V = torch.sum(feats * attention_vectors, dim=1)
+        feats_V = torch.transpose(feats_V, 1, 2)
         return feats_V
 
+
 class SKUnit(nn.Module):
-    def __init__(self, in_features, mid_features, out_features, dim1,dim2,pool_dim, M=4, G=1, r=4, stride=1, L=32):
-        """ Constructor
+    def __init__(
+        self,
+        in_features,
+        mid_features,
+        out_features,
+        dim1,
+        dim2,
+        pool_dim,
+        M=4,
+        G=1,
+        r=4,
+        stride=1,
+        L=32,
+    ):
+        """Constructor
         Args:
             in_features: input channel dimensionality.
             out_features: output channel dimensionality.
@@ -133,73 +201,150 @@ class SKUnit(nn.Module):
             L: the minimum dim of the vector z in paper.
         """
         super(SKUnit, self).__init__()
-        
+
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_features, mid_features, 1, stride=stride, bias=False),
             nn.BatchNorm2d(mid_features),
-            nn.ReLU(inplace=True)
-            )
-        
+            nn.ReLU(inplace=True),
+        )
+
         self.conv2_sk = nn.Sequential(
-            SKConv(input_dim=mid_features, output_dim=out_features, dim1= dim1,dim2=dim2 ,pool_dim=pool_dim, M = 4, G=1, r=4, stride=1 ,L=32),
-            #nn.Conv2d(mid_features, out_features, 1, stride=stride, bias=False),
+            SKConv(
+                input_dim=mid_features,
+                output_dim=out_features,
+                dim1=dim1,
+                dim2=dim2,
+                pool_dim=pool_dim,
+                M=4,
+                G=1,
+                r=4,
+                stride=1,
+                L=32,
+            ),
+            # nn.Conv2d(mid_features, out_features, 1, stride=stride, bias=False),
             nn.BatchNorm2d(out_features),
             nn.ReLU(inplace=True),
-            )
-        
-        
-        
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(mid_features, mid_features*2, 1, stride=1, bias=False),
-            nn.BatchNorm2d(mid_features*2),
-            nn.ReLU(inplace=True),
-            
-            )
-     
+        )
 
-        if in_features == out_features: # when dim not change, input_features could be added diectly to out
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(mid_features, mid_features * 2, 1, stride=1, bias=False),
+            nn.BatchNorm2d(mid_features * 2),
+            nn.ReLU(inplace=True),
+        )
+
+        if (
+            in_features == out_features
+        ):  # when dim not change, input_features could be added diectly to out
             self.shortcut = nn.Sequential()
-        else: # when dim not change, input_features should also change dim to be added to out
+        else:  # when dim not change, input_features should also change dim to be added to out
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_features,out_features , 1, stride=stride, bias=False),
-                nn.BatchNorm2d(out_features)
+                nn.Conv2d(
+                    in_features, out_features, 1, stride=stride, bias=False
+                ),
+                nn.BatchNorm2d(out_features),
             )
-        
+
         self.relu = nn.ReLU(inplace=True)
-    
+
     def forward(self, x):
         residual = x
-        
+
         out = self.conv1(x)
         out = self.conv2_sk(out)
-        #out = self.conv3(out)
-        
+        # out = self.conv3(out)
+
         return self.relu(out + self.shortcut(residual))
-        #return self.relu(out)
-        #return out
-    
+        # return self.relu(out)
+        # return out
+
+
 class SKNet(nn.Module):
-    def __init__(self,dim1,dim2,pool, nums_block_list = [3, 4, 6, 3], strides_list = [1, 2, 2, 2]):
+    def __init__(
+        self,
+        dim1,
+        dim2,
+        pool,
+        nums_block_list=[3, 4, 6, 3],
+        strides_list=[1, 2, 2, 2],
+    ):
         super(SKNet, self).__init__()
         self.basic_conv = nn.Sequential(
             nn.Conv2d(3, 64, 7, 2, 3, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
         )
-        
-        self.maxpool = nn.MaxPool2d(3,2,1)
-        
-        self.stage_1 = self._make_layer(64, 96, 96,dim1,dim2,pool, nums_block=nums_block_list[0], stride=strides_list[0])
-        self.stage_2 = self._make_layer(96, 128 , 128,dim1,dim2,pool, nums_block=nums_block_list[1], stride=strides_list[1])
-        self.stage_3 = self._make_layer(128, 256, 256,dim1,dim2,pool, nums_block=nums_block_list[2], stride=strides_list[2])
-        self.stage_4 = self._make_layer(1024, 1024, 2048,dim1,dim2,pool, nums_block=nums_block_list[3], stride=strides_list[3])
-     
-        
-        
-    def _make_layer(self, in_feats, mid_feats, out_feats,dim1,dim2,pool,nums_block, stride=1):
-        layers=[SKUnit(in_feats, mid_feats, out_feats,dim1,dim2,pool, stride=stride)]
-        for _ in range(1,nums_block):
-            layers.append(SKUnit(out_feats, mid_feats, out_feats,dim1,dim2,pool, stride=stride))
+
+        self.maxpool = nn.MaxPool2d(3, 2, 1)
+
+        self.stage_1 = self._make_layer(
+            64,
+            96,
+            96,
+            dim1,
+            dim2,
+            pool,
+            nums_block=nums_block_list[0],
+            stride=strides_list[0],
+        )
+        self.stage_2 = self._make_layer(
+            96,
+            128,
+            128,
+            dim1,
+            dim2,
+            pool,
+            nums_block=nums_block_list[1],
+            stride=strides_list[1],
+        )
+        self.stage_3 = self._make_layer(
+            128,
+            256,
+            256,
+            dim1,
+            dim2,
+            pool,
+            nums_block=nums_block_list[2],
+            stride=strides_list[2],
+        )
+        self.stage_4 = self._make_layer(
+            1024,
+            1024,
+            2048,
+            dim1,
+            dim2,
+            pool,
+            nums_block=nums_block_list[3],
+            stride=strides_list[3],
+        )
+
+    def _make_layer(
+        self,
+        in_feats,
+        mid_feats,
+        out_feats,
+        dim1,
+        dim2,
+        pool,
+        nums_block,
+        stride=1,
+    ):
+        layers = [
+            SKUnit(
+                in_feats, mid_feats, out_feats, dim1, dim2, pool, stride=stride
+            )
+        ]
+        for _ in range(1, nums_block):
+            layers.append(
+                SKUnit(
+                    out_feats,
+                    mid_feats,
+                    out_feats,
+                    dim1,
+                    dim2,
+                    pool,
+                    stride=stride,
+                )
+            )
         return nn.Sequential(*layers)
 
     def forward(self, x):
@@ -208,43 +353,52 @@ class SKNet(nn.Module):
         fea = self.stage_1(fea)
         fea = self.stage_2(fea)
         fea = self.stage_3(fea)
-        #fea = self.stage_4(fea)
-        
+        # fea = self.stage_4(fea)
+
         return fea
-    
+
+
+import torch.nn.functional as F
+
+from .mingpt import GPT
+
+
 class TamingStyleTransformer(nn.Module):
-    def __init__(self, window_size,num_embeddings, embed_dim=32, nhead=2, num_layers=2):
+    def __init__(self, window_size, num_codebook_vectors):
         super(TamingStyleTransformer, self).__init__()
+        self.num_codebook_vectors = num_codebook_vectors
         self.window_size = window_size
-        self.embedding = nn.Embedding(num_embeddings, embed_dim)  # Codebook size as num_embeddings
-        self.positional_encoding = nn.Parameter(torch.zeros(1, window_size, embed_dim))
-        
-        # Transformer block inspired by Taming Transformers
-        transformer_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=nhead, batch_first=True)
-        self.transformer = nn.TransformerEncoder(transformer_layer, num_layers=num_layers, enable_nested_tensor=True)
-        
-        self.fc_out = nn.Linear(embed_dim, num_embeddings)  # Predict next index
+        transformer_config = {
+            "vocab_size": num_codebook_vectors + 1,
+            "block_size": 512,
+            "n_layer": 2,
+            "n_head": 16,
+            "n_embd": 1024,
+        }
+        self.transformer = GPT(**transformer_config)
+        self.sos_token = 0
 
-    def forward(self, sequence):
-        b, seq_len = sequence.size()
-        corrected_sequence = sequence.clone()  # Start with the original sequence as a baseline
+    def top_k_logits(self, logits, k):
+        v, ix = torch.topk(logits, k)
+        out = logits.clone()
+        out[out < v[..., [-1]]] = -float("inf")
+        return out
 
-        # Sliding window approach for iterative correction
-        for i in range(seq_len - self.window_size + 1):  # Ensure we cover full length
-            # Extract the current sliding window
-            window = corrected_sequence[:, i:i + self.window_size]  # Shape: [b, window_size]
-            
-            # Embed the window and add positional encoding
-            x = self.embedding(window) + self.positional_encoding  # Shape: [b, window_size, embed_dim]
-            
-            # Pass through transformer layers
-            x = self.transformer(x)  # Shape: [b, window_size, embed_dim]
-            
-            # Predict the next index (n+1)
-            next_index_logits = self.fc_out(x[:, -1, :])  # Use last element in window
-            next_index_pred = next_index_logits.argmax(dim=-1)  # Shape: [b]
-            
-            # Update the corrected sequence with the predicted index
-            corrected_sequence[:, i + self.window_size - 1] = next_index_pred
+    def forward(self, indices):
+        sos_tokens = torch.ones(indices.shape[0], 1) * self.sos_token
+        sos_tokens = sos_tokens.long().cuda()
+        new_indices = torch.cat((sos_tokens, indices), dim=1)
+        logits, _ = self.transformer(new_indices[:, :-1])
+        output = self.top_k_logits(logits, self.window_size)
+        probs = F.softmax(logits[:, :, 1:], dim=-1)
+        output = torch.argmax(probs, dim=-1)
+        return output
 
-        return corrected_sequence
+
+if __name__ == "__main__":
+    input_tensor = torch.randint(
+        1, 257, (4, 256), dtype=torch.long
+    )  # Random binary tensor of shape [4, 448]
+    model = TamingStyleTransformer(window_size=9, num_codebook_vectors=256)
+    output = model(input_tensor)
+    print(output)

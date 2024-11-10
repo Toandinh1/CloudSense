@@ -208,39 +208,12 @@ def calulate_error(predicted_keypoints, ground_truth_keypoints):
 def apply_bit_error(
     input_tensor: torch.Tensor, error_rate: float, num_embedding
 ) -> torch.Tensor:
-    """
-    Convert the input tensor to binary and simulate bit errors by flipping bits independently for each value.
-
-    :param input_tensor: Input tensor containing integer values (shape: [batch_size, 56]).
-    :param error_rate: The bit error rate (0 to 1), indicating the proportion of bits to flip.
-    :return: The tensor with simulated bit errors, in binary representation.
-    """
-    batch_size, num_values = input_tensor.shape
-    # Each value will be represented by 8 bits, so we prepare an 8-bit binary representation
-    num_bits = 8
-
-    # Convert each integer in the tensor to an 8-bit binary representation without using string formatting
-    binary_tensor = torch.zeros(
-        (batch_size, num_values * num_bits), dtype=torch.int32
-    )
-    for i in range(num_bits):
-        binary_tensor[:, i::num_bits] = (input_tensor >> (7 - i)) & 1
-
-    # Apply bit errors independently for each value
-    noisy_tensor = binary_tensor.clone()
-    total_bits = batch_size * num_values * num_bits
-    num_bits_to_flip = int(total_bits * error_rate)  # Total bits to flip
-
-    # Randomly select bit indices to flip
-    indices_to_flip = torch.randint(0, total_bits, (num_bits_to_flip,))
-    noisy_tensor.view(-1)[indices_to_flip] ^= 1  # Flip the bits
-
-    # convert to decimal
-    noisy_tensor = binary_to_integer_tensor(noisy_tensor)
-    decimal_tensor = binary_to_integer(noisy_tensor, num_embedding)
-
-    return decimal_tensor
-
+    keep_rate = 1 - error_rate
+    mask = torch.bernoulli(keep_rate * torch.ones(input_tensor.shape, device=input_tensor.device))
+    mask = mask.round().to(dtype=torch.int64)
+    random_indices = torch.randint_like(input_tensor, num_embedding)
+    new_indices = mask * input_tensor + (1 - mask) * random_indices
+    return new_indices
 
 def apply_bit_loss(tensor: torch.Tensor, loss_rate: float) -> torch.Tensor:
     """
@@ -270,72 +243,3 @@ def apply_bit_loss(tensor: torch.Tensor, loss_rate: float) -> torch.Tensor:
     return tensor[indices_to_keep]
 
 
-def binary_to_integer(binary_tensor, num_embedding):
-    """
-    Converts a binary tensor of shape [b, 56, 8] to an integer tensor of shape [b, 56].
-
-    Args:
-        binary_tensor (torch.Tensor): A tensor of shape [b, 56, 8], where each value is a binary bit (0 or 1).
-        num_embedding (int): The maximum integer value allowed. Any value greater than this will be clamped.
-
-    Returns:
-        torch.Tensor: A tensor of shape [b, 56], where each element is the integer representation of the binary number,
-                      clamped to not exceed `num_embedding`.
-    """
-    # Ensure the input is of the correct shape and type
-    assert (
-        binary_tensor.shape[2] == 8
-    ), "The input tensor must have a size of 8 in the third dimension (bits)."
-    assert binary_tensor.dtype in [
-        torch.int32,
-        torch.bool,
-    ], "The input tensor must be of type int32 or bool (binary values)."
-
-    # Convert binary tensor to integer by reshaping and applying bit shifting
-    # Each bit is a power of 2, so we can multiply the bits by 2^position and sum them
-    powers_of_two = torch.pow(
-        2,
-        torch.arange(7, -1, -1, dtype=torch.int32, device=binary_tensor.device),
-    )  # 2^7, 2^6, ..., 2^0
-    integer_tensor = torch.matmul(
-        binary_tensor, powers_of_two
-    )  # This does the bit-wise sum
-
-    # Clamp values greater than num_embedding to num_embedding
-    integer_tensor = torch.clamp(integer_tensor, max=num_embedding - 1, min=0)
-
-    return integer_tensor.to(torch.int64)
-
-
-def binary_to_integer_tensor(binary_tensor):
-    """
-    Converts a binary tensor of shape [b, 448] into a tensor of shape [b, 56, 8],
-    where each 8 consecutive binary values represent one integer.
-
-    Args:
-        binary_tensor (torch.Tensor): A tensor of shape [b, 448], where each value is a binary bit (0 or 1).
-
-    Returns:
-        torch.Tensor: A tensor of shape [b, 56, 8], where each group of 8 bits represents a single integer.
-    """
-    # Ensure the input tensor is of shape [b, 448]
-    # assert (
-    #     binary_tensor.shape[1] == 448
-    # ), "The input tensor must have a size of 448 in the second dimension."
-    # assert (
-    #     binary_tensor.dtype == torch.int32
-    # ), "The input tensor must be of type int32 (binary values)."
-
-    # Reshape the tensor to [b, 56, 8] (each group of 8 consecutive bits)
-    reshaped_tensor = binary_tensor.view(binary_tensor.shape[0], 256, 8)
-
-    return reshaped_tensor
-
-
-if __name__ == "__main__":
-    input_tensor = torch.randint(
-        0, 256, (4, 56), dtype=torch.int64
-    )  # Random binary tensor of shape [4, 448]
-    decode_tensor = apply_bit_error(input_tensor, 0.9, 256)
-    print(input_tensor)
-    print(decode_tensor)

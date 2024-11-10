@@ -125,9 +125,9 @@ def main_CloudSenseGAN(
                     )
                     / 32
                 )
-                rec_loss = criterion_L2(reconstructed_csi, csi_data) 
+                rec_loss = criterion_L2(reconstructed_csi, csi_data)
 
-                loss = correct_loss+ vq_loss+ rec_loss+ hpe_loss
+                loss = correct_loss + vq_loss + rec_loss + hpe_loss
                 loss.backward(retain_graph=True)
                 total_loss += loss.item()
                 optimizer.step()
@@ -190,12 +190,12 @@ def main_CloudSenseGAN(
                 # print('saving the model at the end of epoch %d with pck_50: %.3f' % (epoch_index, pck_50_overall))
                 torch.save(model, os.path.join(checkpoint_folder, "best.pt"))
                 pck_50_overall_max = pck_50_overall
-                message = f"\nBest Epoch in epoch {epoch} with PCK50: {pck_50_overall_max}, PCK20: {pck_20_overall}"
+                message = f"\nBest Epoch in epoch {epoch} with cookbook size is {model.vq.codebook_size} PCK50: {pck_50_overall_max}, PCK20: {pck_20_overall}"
             torch.save(model, os.path.join(checkpoint_folder, "last.pt"))
             scheduler.step()
         torch.cuda.empty_cache()
         print(message)
-        for error_rate in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+        for error_rate in np.arange(0.0, 1.0, 0.1):
             print(
                 f"with {error_rate_training} in training and {error_rate} in testing:"
             )

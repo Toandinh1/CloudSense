@@ -106,13 +106,11 @@ experiment_config = {
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1e-5,
-                "epoch": 20,
+                "epoch": 100,
                 "unreliable_mode": 0,  # 0: bit error   #1: bit loss
             },
         },
     },
 }
 
-skip_pipeline = [
-    "RSCNet", "EfficientFi", "CSINet", "LASSO", "DeepCMC", "Ours"
-]
+skip_pipeline = ["RSCNet", "EfficientFi", "CSINet", "LASSO", "DeepCMC", "Ours"]
