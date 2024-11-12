@@ -158,14 +158,25 @@ def calulate_error(predicted_keypoints, ground_truth_keypoints):
     predicted_keypoints = np.array(predicted_keypoints.detach().numpy())
     ground_truth_keypoints = np.array(ground_truth_keypoints.detach().numpy())
 
+    if np.isnan(predicted_keypoints).any() or np.isinf(predicted_keypoints).any():
+        predicted_keypoints = np.nan_to_num(predicted_keypoints) + 1e-8
+        # print(predicted_keypoints)
     # Validate input shapes
-    assert predicted_keypoints.shape == ground_truth_keypoints.shape, "Input shapes must match"
+    assert (
+        predicted_keypoints.shape == ground_truth_keypoints.shape
+    ), "Input shapes must match"
 
     N = predicted_keypoints.shape[0]  # Number of samples
     num_joints = predicted_keypoints.shape[2]  # Number of keypoints
 
     # Calculate MPJPE
-    mpjpe = np.mean(np.sqrt(np.sum(np.square(predicted_keypoints - ground_truth_keypoints), axis=2)))
+    mpjpe = np.mean(
+        np.sqrt(
+            np.sum(
+                np.square(predicted_keypoints - ground_truth_keypoints), axis=2
+            )
+        )
+    )
 
     # Calculate PA-MPJPE
     pampjpe = np.zeros(N)
@@ -175,11 +186,17 @@ def calulate_error(predicted_keypoints, ground_truth_keypoints):
         frame_gt = ground_truth_keypoints[n]  # Shape [h, w]
 
         # Compute similarity transform
-        _, Z, T, b, c = compute_similarity_transform(frame_gt, frame_pred, compute_optimal_scale=True)
+        _, Z, T, b, c = compute_similarity_transform(
+            frame_gt, frame_pred, compute_optimal_scale=True
+        )
 
         # Apply the transformation to predictions
         frame_pred_transformed = (b * frame_pred @ T) + c
-        pampjpe[n] = np.mean(np.sqrt(np.sum(np.square(frame_pred_transformed - frame_gt), axis=1)))
+        pampjpe[n] = np.mean(
+            np.sqrt(
+                np.sum(np.square(frame_pred_transformed - frame_gt), axis=1)
+            )
+        )
 
     # Compute average PA-MPJPE
     pampjpe = np.mean(pampjpe)

@@ -84,23 +84,22 @@ def decode_config(config):
     val_form = {}
     # Limitation to actions (protocol)
     if config["protocol"] == "protocol1":  # Daily actions
-        # actions = [
-        #     "A02",
-        #     "A03",
-        #     "A04",
-        #     "A05",
-        #     "A13",
-        #     "A14",
-        #     "A17",
-        #     "A18",
-        #     "A19",
-        #     "A20",
-        #     "A21",
-        #     "A22",
-        #     "A23",
-        #     "A27",
-        # ]
-        actions = ["A02"]
+        actions = [
+            "A02",
+            "A03",
+            "A04",
+            "A05",
+            "A13",
+            "A14",
+            "A17",
+            "A18",
+            "A19",
+            "A20",
+            "A21",
+            "A22",
+            "A23",
+            "A27",
+        ]
     elif config["protocol"] == "protocol2":  # Rehabilitation actions:
         actions = [
             "A01",

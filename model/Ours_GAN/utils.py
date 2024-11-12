@@ -11,10 +11,10 @@ from torch import nn
 
 
 def NMSELoss(input, target):
-    
+
     # Calculate squared error
     squared_error = (input - target) ** 2
-        
+
     # Calculate mean squared error
     mse = torch.mean(squared_error)
 
@@ -35,7 +35,7 @@ def nmse(x, x_hat):
     )
 
 
-def compute_pck_pckh(dt_kpts,gt_kpts,thr):
+def compute_pck_pckh(dt_kpts, gt_kpts, thr):
     """
     pck指标计算
     :param dt_kpts:算法检测输出的估计结果,shape=[n,h,w]=[行人数，２，关键点个数]
@@ -45,26 +45,31 @@ def compute_pck_pckh(dt_kpts,gt_kpts,thr):
     　　　　　　　　　　　pckh指标：头部长度，头部rect的对角线欧式距离；
     :return: 相关指标
     """
-    dt=np.array(dt_kpts)
-    gt=np.array(gt_kpts)
-    assert(dt.shape[0]==gt.shape[0])
-    kpts_num=gt.shape[2] #keypoints
-    ped_num=gt.shape[0] #batch_size
-    #compute dist
-    scale=np.sqrt(np.sum(np.square(gt[:,:,1]-gt[:,:,11]),1)) #right shoulder--left hip
-    #dist=np.sqrt(np.sum(np.square(dt-gt),1))/np.tile(scale,(gt.shape[2],1)).T
-    dist=np.sqrt(np.sum(np.square(dt-gt),1))/np.tile(scale,(gt.shape[2],1)).T
-    #dist=np.sqrt(np.sum(np.square(dt-gt),1))
-    #compute pck
-    pck = np.zeros(gt.shape[2]+1)
+    dt = np.array(dt_kpts)
+    gt = np.array(gt_kpts)
+    assert dt.shape[0] == gt.shape[0]
+    kpts_num = gt.shape[2]  # keypoints
+    ped_num = gt.shape[0]  # batch_size
+    # compute dist
+    scale = np.sqrt(
+        np.sum(np.square(gt[:, :, 1] - gt[:, :, 11]), 1)
+    )  # right shoulder--left hip
+    # dist=np.sqrt(np.sum(np.square(dt-gt),1))/np.tile(scale,(gt.shape[2],1)).T
+    dist = (
+        np.sqrt(np.sum(np.square(dt - gt), 1))
+        / np.tile(scale, (gt.shape[2], 1)).T
+    )
+    # dist=np.sqrt(np.sum(np.square(dt-gt),1))
+    # compute pck
+    pck = np.zeros(gt.shape[2] + 1)
     for kpt_idx in range(kpts_num):
-        pck[kpt_idx] = 100*np.mean(dist[:,kpt_idx] <= thr)
+        pck[kpt_idx] = 100 * np.mean(dist[:, kpt_idx] <= thr)
         # compute average pck
-    pck[17] = 100*np.mean(dist <= thr)
+    pck[17] = 100 * np.mean(dist <= thr)
     return pck
 
 
-def compute_pck_pckh_18(dt_kpts,gt_kpts,thr):
+def compute_pck_pckh_18(dt_kpts, gt_kpts, thr):
     """
     pck指标计算
     :param dt_kpts:算法检测输出的估计结果,shape=[n,h,w]=[行人数，２，关键点个数]
@@ -74,21 +79,26 @@ def compute_pck_pckh_18(dt_kpts,gt_kpts,thr):
     　　　　　　　　　　　pckh指标：头部长度，头部rect的对角线欧式距离；
     :return: 相关指标
     """
-    dt=np.array(dt_kpts)
-    gt=np.array(gt_kpts)
-    assert(dt.shape[0]==gt.shape[0])
-    kpts_num=gt.shape[2] #keypoints
-    ped_num=gt.shape[0] #batch_size
-    #compute dist
-    scale=np.sqrt(np.sum(np.square(gt[:,:,5]-gt[:,:,8]),1)) #right shoulder--left hip
-    dist=np.sqrt(np.sum(np.square(dt-gt),1))/np.tile(scale,(gt.shape[2],1)).T
-    #dist=np.sqrt(np.sum(np.square(dt-gt),1))
-    #compute pck
-    pck = np.zeros(gt.shape[2]+1)
+    dt = np.array(dt_kpts)
+    gt = np.array(gt_kpts)
+    assert dt.shape[0] == gt.shape[0]
+    kpts_num = gt.shape[2]  # keypoints
+    ped_num = gt.shape[0]  # batch_size
+    # compute dist
+    scale = np.sqrt(
+        np.sum(np.square(gt[:, :, 5] - gt[:, :, 8]), 1)
+    )  # right shoulder--left hip
+    dist = (
+        np.sqrt(np.sum(np.square(dt - gt), 1))
+        / np.tile(scale, (gt.shape[2], 1)).T
+    )
+    # dist=np.sqrt(np.sum(np.square(dt-gt),1))
+    # compute pck
+    pck = np.zeros(gt.shape[2] + 1)
     for kpt_idx in range(kpts_num):
-        pck[kpt_idx] = 100*np.mean(dist[:,kpt_idx] <= thr)
+        pck[kpt_idx] = 100 * np.mean(dist[:, kpt_idx] <= thr)
         # compute average pck
-    pck[18] = 100*np.mean(dist <= thr)
+    pck[18] = 100 * np.mean(dist <= thr)
     return pck
 
 
@@ -162,6 +172,12 @@ def calulate_error(predicted_keypoints, ground_truth_keypoints):
     predicted_keypoints = np.array(predicted_keypoints.detach().numpy())
     ground_truth_keypoints = np.array(ground_truth_keypoints.detach().numpy())
 
+    if (
+        np.isnan(predicted_keypoints).any()
+        or np.isinf(predicted_keypoints).any()
+    ):
+        predicted_keypoints = np.nan_to_num(predicted_keypoints) + 1e-8
+        # print(predicted_keypoints)
     # Validate input shapes
     assert (
         predicted_keypoints.shape == ground_truth_keypoints.shape
@@ -209,11 +225,14 @@ def apply_bit_error(
     input_tensor: torch.Tensor, error_rate: float, num_embedding
 ) -> torch.Tensor:
     keep_rate = 1 - error_rate
-    mask = torch.bernoulli(keep_rate * torch.ones(input_tensor.shape, device=input_tensor.device))
+    mask = torch.bernoulli(
+        keep_rate * torch.ones(input_tensor.shape, device=input_tensor.device)
+    )
     mask = mask.round().to(dtype=torch.int64)
     random_indices = torch.randint_like(input_tensor, num_embedding)
     new_indices = mask * input_tensor + (1 - mask) * random_indices
     return new_indices
+
 
 def apply_bit_loss(tensor: torch.Tensor, loss_rate: float) -> torch.Tensor:
     """
@@ -241,5 +260,3 @@ def apply_bit_loss(tensor: torch.Tensor, loss_rate: float) -> torch.Tensor:
     )
 
     return tensor[indices_to_keep]
-
-

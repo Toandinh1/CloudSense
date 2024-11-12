@@ -165,10 +165,10 @@ class regression(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self):
+    def __init__(self, in_channel):
         super(Decoder, self).__init__()
         self.transposed_conv1 = nn.ConvTranspose2d(
-            in_channels=256,
+            in_channels=in_channel,
             out_channels=128,
             kernel_size=3,
             stride=2,
@@ -215,7 +215,7 @@ class Decoder(nn.Module):
 
 
 class CloudSense(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, output_hpe=34):
         super(CloudSense, self).__init__()
         embedding_dim = config["embedding_dim"]
         commitment_cost = config["commitment_cost"]
@@ -252,9 +252,11 @@ class CloudSense(nn.Module):
         )
 
         self.regression = regression(
-            input_dim=embedding_dim * 28 * 2, output_dim=34, hidden_dim=32
+            input_dim=embedding_dim * 28 * 2,
+            output_dim=output_hpe,
+            hidden_dim=32,
         )
-        self._decoder = Decoder()
+        self._decoder = Decoder(in_channel=embedding_dim)
         self.vq = VectorQuantize(
             dim=56,
             codebook_size=config["initial_cook_size"],
@@ -335,27 +337,28 @@ class CloudSense(nn.Module):
                 noisy_indices = indices
         noisy_indices = noisy_indices.cuda()
         # print(torch.mean((noisy_indices == indices).float()))
-        correct_indices = self.recieved_indice_corrector(noisy_indices)
-        # print(correct_indices.dtype, indices.dtype)
-        mask = (correct_indices == indices).float()
-        accuracy_loss = 1 - mask.mean()
-        cross_entropy_loss = F.cross_entropy(
-            correct_indices.float(), indices.float()
-        )
-        correct_loss = (accuracy_loss + cross_entropy_loss) / 2
-        # Lưu toàn bộ tensor vào file văn bản
-        z_reconstructed = self.vq.get_codes_from_indices(correct_indices)
+        # correct_indices = self.recieved_indice_corrector(noisy_indices)
+        # # print(correct_indices.dtype, indices.dtype)
+        # mask = (correct_indices == indices).float()
+        # accuracy_loss = 1 - mask.mean()
+        # cross_entropy_loss = F.cross_entropy(
+        #     correct_indices.float(), indices.float()
+        # )
+        # correct_loss = (accuracy_loss + cross_entropy_loss) / 2
+        # # Lưu toàn bộ tensor vào file văn bản
+        # z_reconstructed = self.vq.get_codes_from_indices(correct_indices)
 
         # print(F.mse_loss(z_quantized, z_reconstructed), noisy_indices.shape)
         # Reshape quantized vector for decoder and regression
-        z_reconstructed = z_reconstructed.view(batch, self.embedding_dim, 28, 2)
+        correct_loss = 0
+        z_reconstructed = z_quantized.view(batch, self.embedding_dim, 28, 2)
 
         # Calculate reconstructed output and regression prediction
         y_p = self.regression(z_reconstructed)
         r_x = self._decoder(z_reconstructed)
 
         # Reshape regression output
-        y_p = y_p.reshape(batch, 17, 2)
+        y_p = y_p.reshape(batch, -1, 2)
 
         # Compute losses
         reconstruction_loss = F.mse_loss(r_x, x)
@@ -372,3 +375,21 @@ class CloudSense(nn.Module):
         vq_loss = reconstruction_loss + commitment_loss + codebook_loss
 
         return correct_loss, vq_loss, z, r_x, y_p
+
+
+class TSNECloudSense(CloudSense):
+    def __init__(self, config, output_hpe=34):
+        super().__init__(config=config, output_hpe=output_hpe)
+
+    def forward(self, x, is_test=False, error_rate=None):
+        batch = x.shape[0]
+
+        # Encode input
+        z = self._encoder(x)
+        z = self._pre_vq_conv(z)
+        z = z.view(batch, -1, 56)
+
+        # Quantization
+        z_quantized, indices, vq_loss = self.vq(z)
+
+        return z, z_quantized

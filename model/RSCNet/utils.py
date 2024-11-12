@@ -162,6 +162,9 @@ def calulate_error(predicted_keypoints, ground_truth_keypoints):
     predicted_keypoints = np.array(predicted_keypoints.detach().numpy())
     ground_truth_keypoints = np.array(ground_truth_keypoints.detach().numpy())
 
+    if np.isnan(predicted_keypoints).any() or np.isinf(predicted_keypoints).any():
+        predicted_keypoints = np.nan_to_num(predicted_keypoints) + 1e-8
+        # print(predicted_keypoints)
     # Validate input shapes
     assert (
         predicted_keypoints.shape == ground_truth_keypoints.shape

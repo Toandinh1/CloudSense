@@ -47,7 +47,7 @@ def compute_compression_rate(
 
 
 class EfficientFi(nn.Module):
-    def __init__(self, config, compress_rate):
+    def __init__(self, config, compress_rate, output_hpe = 36):
         super(EfficientFi, self).__init__()
         self.num_embeddings = config["num_embeddings"]
         self.embedding_dim = config["embedding_dim"]
@@ -72,7 +72,7 @@ class EfficientFi(nn.Module):
             stride=1,
         )
         self._decoder = Decoder()
-        self.hpe_estimator = HumanPoseEstimator(2400, 34, 32)
+        self.hpe_estimator = HumanPoseEstimator(2400, output_hpe, 32)
 
     def forward(self, x, is_test=False, error_rate=None):
         batch_size = x.shape[0]
@@ -118,6 +118,6 @@ class EfficientFi(nn.Module):
         # r_x = F.interpolate(
         #     r_x, size=(114, 10), mode="bilinear", align_corners=True
         # )
-        pred_keypoint = self.hpe_estimator(latent).reshape(batch_size, 17, 2)
+        pred_keypoint = self.hpe_estimator(latent).reshape(batch_size, -1, 2)
 
         return vq_loss, r_x, pred_keypoint

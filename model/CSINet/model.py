@@ -60,11 +60,11 @@ def quantize_and_restore(tensor):
     return restored_tensor
 
 class CsiNetAutoencoder(nn.Module):
-    def __init__(self, config, compression_rate):
+    def __init__(self, config, compression_rate, output_hpe = 36):
         super(CsiNetAutoencoder, self).__init__()
         self.encoder = Encoder(compression_rate)
         self.decoder = Decoder(compression_rate)
-        self.human_pose_estimator = HumanPoseEstimator(input_dim_hpe[compression_rate], 34, 32)
+        self.human_pose_estimator = HumanPoseEstimator(input_dim_hpe[compression_rate], output_hpe, 32)
     def forward(self, x, check_compression_rate=False):
         batch = x.size(0)
         
@@ -83,6 +83,6 @@ class CsiNetAutoencoder(nn.Module):
         r_x = self.decoder(encoded)
 
         # HPE task
-        pred_keypoint = self.human_pose_estimator(encoded).reshape(batch, 17, 2)
+        pred_keypoint = self.human_pose_estimator(encoded).reshape(batch, -1, 2)
         
         return r_x, pred_keypoint

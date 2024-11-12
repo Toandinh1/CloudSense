@@ -35,7 +35,7 @@ def compute_compression_rate(original_tensor: torch.Tensor, compressed_tensor: t
     return compression_rate
 
 class RSCNet(nn.Module):
-    def __init__(self, config=True, compression_rate = 1):
+    def __init__(self, config=True, compression_rate = 1, output_hpe = 36):
         super(RSCNet, self).__init__()
         self.compression_rate = compression_rate
         self.config = config
@@ -63,7 +63,7 @@ class RSCNet(nn.Module):
         self.decoder = Decoder(self.input_shape, self.config['expansion'])
 
         # HPE Task
-        self.human_pose_estimator = HumanPoseEstimator(512, 34, 32)
+        self.human_pose_estimator = HumanPoseEstimator(512, output_hpe, 32)
         
     def forward(self, x, check_compression_rate = False):
         batch_size = x.shape[0]
@@ -97,7 +97,7 @@ class RSCNet(nn.Module):
         
         # HPE task
         pred_keypoint = self.human_pose_estimator(c_r_d.view(batch_size, -1))
-        pred_keypoint = pred_keypoint.reshape(batch_size,17,2)
+        pred_keypoint = pred_keypoint.reshape(batch_size,-1,2)
 
         return new_x_hat, pred_keypoint
         

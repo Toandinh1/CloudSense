@@ -312,7 +312,7 @@ class CloudSense(nn.Module):
             dim=56,
             codebook_size=config["initial_cook_size"],
             commitment_weight=commitment_cost,
-            decay=0.8
+            decay=0.8,
         )
         self.embedding_dim = embedding_dim
         self.commitment_cost = commitment_cost
@@ -341,7 +341,7 @@ class CloudSense(nn.Module):
                 dim=56,
                 codebook_size=new_codebook_size,
                 commitment_weight=self.commitment_cost,
-                decay= 0.8
+                decay=0.8,
             ).cuda()
             self.recieved_indice_corrector = TamingStyleTransformer(
                 window_size=9, num_embeddings=new_codebook_size
@@ -412,6 +412,6 @@ class CloudSense(nn.Module):
         r_x = self._decoder(z_reconstructed)
 
         # Reshape regression output
-        y_p = y_p.reshape(batch, 17, 2)
+        y_p = y_p.reshape(batch, -1, 2)
 
         return correct_loss, vq_loss, z, r_x, y_p

@@ -41,7 +41,7 @@ compress_dict = {
     }
 }
 class LassoAutoEncoder(nn.Module):
-    def __init__(self, config, compression_rate):
+    def __init__(self, config, compression_rate, output_hpe = 36):
         super(LassoAutoEncoder, self).__init__()
         self.input_shape = config["input_shape"]
         self.flat_input_size = np.prod(self.input_shape)
@@ -54,7 +54,7 @@ class LassoAutoEncoder(nn.Module):
             nn.Unflatten(1, self.input_shape)
         )
         
-        self.human_pose_estimator = HumanPoseEstimator(compress_dict[compression_rate]["input_hpe"], 34, 32)
+        self.human_pose_estimator = HumanPoseEstimator(compress_dict[compression_rate]["input_hpe"], output_hpe, 32)
         
     def forward(self, x, check_compression_rate = False):
         batch = x.size(0)
@@ -69,5 +69,5 @@ class LassoAutoEncoder(nn.Module):
             print(f"Compression rate: {compression_rate}")
         
         reconstructed_x = self.decoder(compressed_x)
-        pred_keypoint = self.human_pose_estimator(compressed_x).reshape(batch, 17, 2)
+        pred_keypoint = self.human_pose_estimator(compressed_x).reshape(batch, -1, 2)
         return reconstructed_x, pred_keypoint

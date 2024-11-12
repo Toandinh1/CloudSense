@@ -33,11 +33,11 @@ def compute_compression_rate(original_tensor: torch.Tensor, compressed_tensor: t
     return compression_rate
 
 class DeepCMC(nn.Module):
-    def __init__(self):
+    def __init__(self, output_hpe = 34):
         super(DeepCMC, self).__init__()
         self.encoder = FeatureEncoder()
         self.decoder = FeatureDecoder()
-        self.human_pose_estimator = HumanPoseEstimator(1024, 34, 32)
+        self.human_pose_estimator = HumanPoseEstimator(1024, output_hpe, 32)
 
     def forward(self, x, check_compression_rate = False):
         batch = x.shape[0]
@@ -49,6 +49,6 @@ class DeepCMC(nn.Module):
             print(f"\nEncoder size: {quantized.size()}")
             print(f"Compression rate: {compression_rate}")
         decoded = self.decoder(quantized)
-        red_keypoint = self.human_pose_estimator(quantized).reshape(batch, 17, 2)
+        red_keypoint = self.human_pose_estimator(quantized).reshape(batch, -1, 2)
         r_x = F.interpolate(decoded, size=(114,10), mode="bilinear", align_corners=True)
         return decoded, red_keypoint

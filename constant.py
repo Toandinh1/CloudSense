@@ -17,8 +17,19 @@ from model import (
 )
 
 experiment_config = {
-    "mmfi_config": "/home/jackson-devworks/Desktop/CloudSense/dataset_lib/config.yaml",
-    "dataset_root": "/home/jackson-devworks/Desktop/HPE/Dataset",
+    "dataset_choice": 0,
+    "data": {
+        0: {
+            "name": "MM-Fi",
+            "mmfi_config": "/home/jackson-devworks/Desktop/CloudSense/dataset_lib/config.yaml",
+            "dataset_root": "/home/jackson-devworks/Desktop/HPE/Dataset",
+        },
+        1: {
+            "name": "Wi-Pose",
+            "dataset_root": "/home/jackson-devworks/Desktop/HPE/Wi-Pose",
+            "batch_size": 1024,
+        },
+    },
     "checkpoint_folder": "/home/jackson-devworks/Desktop/CloudSense/output",
     "baseline": {
         "RSCNet": {
@@ -31,7 +42,7 @@ experiment_config = {
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1.5e-6,
-                "epoch": 20,
+                "epoch": 150,
             },
         },
         "EfficientFi": {
@@ -42,7 +53,7 @@ experiment_config = {
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1e-5,
-                "epoch": 10,
+                "epoch": 50,
                 "unreliable_mode": 2,  # 0: bit error   #1: bit loss
             },
         },
@@ -56,7 +67,7 @@ experiment_config = {
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1.5e-6,
-                "epoch": 20,
+                "epoch": 50,
             },
         },
         "LASSO": {
@@ -66,7 +77,7 @@ experiment_config = {
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1.5e-6,
-                "epoch": 30,
+                "epoch": 50,
             },
         },
         "DeepCMC": {
@@ -75,7 +86,7 @@ experiment_config = {
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1.5e-6,
-                "epoch": 20,
+                "epoch": 50,
             },
         },
         "Ours": {
@@ -90,24 +101,26 @@ experiment_config = {
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1e-5,
-                "epoch": 50,
+                "epoch": 100,
                 "unreliable_mode": 0,  # 0: bit error   #1: bit loss
             },
         },
         "Our_GAN": {
             "pipeline": main_CloudSenseGAN,
             "config": {
-                "min_codebook_size": 16,
+                "min_codebook_size": 32,
                 "max_codebook_size": 128,
-                "initial_cook_size": 128,
+                "initial_cook_size": 32,
                 "change_step": 16,
                 "embedding_dim": 256,
                 "commitment_cost": 1,
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1e-5,
-                "epoch": 100,
+                "epoch": 20,
                 "unreliable_mode": 0,  # 0: bit error   #1: bit loss
+                "unrilable_rate_in_training": 0,
+                "lambda": 0.10,
             },
         },
     },

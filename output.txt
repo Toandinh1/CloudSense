@@ -1,0 +1,20 @@
+********************
+Run 1
+**********
+Baseline Our_GAN
+{'min_codebook_size': 32, 'max_codebook_size': 128, 'initial_cook_size': 32, 'change_step': 16, 'embedding_dim': 64, 'commitment_cost': 1, 'lr': 0.01, 'momentum': 0.9, 'weight_decay': 1e-05, 'epoch': 20, 'unreliable_mode': 0, 'unrilable_rate_in_training': 0, 'lambda': 0.1}
+
+Best Epoch in epoch 2 with cookbook size is 32 PCK50: 79.96387729494982, PCK20: 42.0414488739793
+with embeddingdim: 64, lambda: 0.1 and 0.0 in testing:
+test result: nmse: -14.803, pck_50: 78.196, pck_40: 72.305, pck_30: 60.548, pck_20: 36.985, pck_10: 16.399, pck_5: 4.719, mpjpe: 171.543, pa_mpjpe: 90.997
+{'min_codebook_size': 32, 'max_codebook_size': 128, 'initial_cook_size': 32, 'change_step': 16, 'embedding_dim': 64, 'commitment_cost': 1, 'lr': 0.01, 'momentum': 0.9, 'weight_decay': 1e-05, 'epoch': 20, 'unreliable_mode': 0, 'unrilable_rate_in_training': 0, 'lambda': 0.25}
+
+Best Epoch in epoch 5 with cookbook size is 32 PCK50: 81.40603870858689, PCK20: 43.26341212877723
+with embeddingdim: 64, lambda: 0.25 and 0.0 in testing:
+test result: nmse: -15.793, pck_50: 79.087, pck_40: 73.702, pck_30: 61.625, pck_20: 40.491, pck_10: 16.526, pck_5: 4.478, mpjpe: 168.366, pa_mpjpe: 90.914
+{'min_codebook_size': 32, 'max_codebook_size': 128, 'initial_cook_size': 32, 'change_step': 16, 'embedding_dim': 64, 'commitment_cost': 1, 'lr': 0.01, 'momentum': 0.9, 'weight_decay': 1e-05, 'epoch': 20, 'unreliable_mode': 0, 'unrilable_rate_in_training': 0, 'lambda': 0.5}
+
+Best Epoch in epoch 3 with cookbook size is 32 PCK50: 81.00735619181356, PCK20: 43.443879375357554
+with embeddingdim: 64, lambda: 0.5 and 0.0 in testing:
+test result: nmse: -15.175, pck_50: 80.165, pck_40: 73.692, pck_30: 62.279, pck_20: 41.752, pck_10: 16.058, pck_5: 4.500, mpjpe: 168.066, pa_mpjpe: 91.304
+{'min_codebook_size': 32, 'max_codebook_size': 128, 'initial_cook_size': 32, 'change_step': 16, 'embedding_dim': 64, 'commitment_cost': 1, 'lr': 0.01, 'momentum': 0.9, 'weight_decay': 1e-05, 'epoch': 20, 'unreliable_mode': 0, 'unrilable_rate_in_training': 0, 'lambda': 0.75}
