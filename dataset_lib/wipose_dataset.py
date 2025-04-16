@@ -21,13 +21,7 @@ class WiPoseDataset(Dataset):
             CSI_data = torch.Tensor(
                 file["CSI"][:]
             )  # Assuming 'CSI' is a dataset in your file
-            print(CSI_data.shape)
-            CSI_data = CSI_data.view(3, -1, 10)
-            CSI_data = CSI_data.unsqueeze(0)
-            CSI_data = F.interpolate(
-                CSI_data, size=(114, 10), mode="bilinear", align_corners=True
-            )
-            CSI_data = CSI_data.squeeze(0)
+            CSI_data = CSI_data.view(9, 30, 5)
             keypoints = torch.Tensor(
                 file["SkeletonPoints"][:]
             )  # Assuming 'SkeletonPoints' is a dataset in your file

@@ -17,7 +17,7 @@ from model import (
 )
 
 experiment_config = {
-    "dataset_choice": 0,
+    "dataset_choice": 1,
     "data": {
         0: {
             "name": "MM-Fi",
@@ -27,7 +27,7 @@ experiment_config = {
         1: {
             "name": "Wi-Pose",
             "dataset_root": "/home/jackson-devworks/Desktop/HPE/Wi-Pose",
-            "batch_size": 1024,
+            "batch_size": 128,
         },
     },
     "checkpoint_folder": "/home/jackson-devworks/Desktop/CloudSense/output",
@@ -117,10 +117,10 @@ experiment_config = {
                 "lr": 1e-2,
                 "momentum": 0.9,
                 "weight_decay": 1e-5,
-                "epoch": 20,
+                "epoch": 100,
                 "unreliable_mode": 0,  # 0: bit error   #1: bit loss
                 "unrilable_rate_in_training": 0,
-                "lambda": 0.10,
+                "lambda": 1.0,
             },
         },
     },

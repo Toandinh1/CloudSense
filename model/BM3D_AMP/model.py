@@ -33,7 +33,7 @@ def compute_compression_rate(original_tensor: torch.Tensor, compressed_tensor: t
     return compression_rate
 
 class DeepCMC(nn.Module):
-    def __init__(self, output_hpe = 34):
+    def __init__(self, output_hpe = 36):
         super(DeepCMC, self).__init__()
         self.encoder = FeatureEncoder()
         self.decoder = FeatureDecoder()
@@ -52,3 +52,48 @@ class DeepCMC(nn.Module):
         red_keypoint = self.human_pose_estimator(quantized).reshape(batch, -1, 2)
         r_x = F.interpolate(decoded, size=(114,10), mode="bilinear", align_corners=True)
         return decoded, red_keypoint
+    
+
+if __name__ == "__main__":
+    model = DeepCMC()
+
+    # Create sample input with shape [batch_size, channels, height, width]
+    inputs = torch.rand(size=(1, 3, 114, 10), dtype=torch.float32)  # Batch size of 1
+
+    # Move model and input to GPU if available
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    inputs = inputs.to(device)
+
+    # Set the model to evaluation mode
+    model.eval()
+
+    # Measure inference time
+    with torch.no_grad():  # Disable gradient calculation for inference
+        if device.type == 'cuda':
+            # Use CUDA events for GPU timing
+            start = torch.cuda.Event(enable_timing=True)
+            end = torch.cuda.Event(enable_timing=True)
+            
+            start.record()  # Start timing
+            output = model(inputs)  # Model inference
+            end.record()  # End timing
+            
+            # Waits for everything to finish running
+            torch.cuda.synchronize()
+            
+            # Calculate elapsed time
+            inference_time_ms = start.elapsed_time(end)
+            print(f"Inference Time in GPU: {inference_time_ms:.3f} ms")
+        
+        else:
+            # Use time.time() for CPU timing
+            start_time = time.time()
+            output = model(inputs)  # Model inference
+            end_time = time.time()
+            
+            # Calculate elapsed time in milliseconds
+            inference_time_ms = (end_time - start_time) * 1000
+            print(f"Inference Time: {inference_time_ms:.3f} ms")
+
+    # print(output)

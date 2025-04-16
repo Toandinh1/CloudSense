@@ -86,3 +86,56 @@ class CsiNetAutoencoder(nn.Module):
         pred_keypoint = self.human_pose_estimator(encoded).reshape(batch, -1, 2)
         
         return r_x, pred_keypoint
+    
+
+if __name__ == "__main__":
+    config = {
+                "img_channels": 3,
+                "img_height": 114,
+                "img_width": 10,
+                "residual_num": 1,
+                "lr": 1e-2,
+                "momentum": 0.9,
+                "weight_decay": 1.5e-6,
+                "epoch": 50,
+            }
+    model = CsiNetAutoencoder(config, 16)
+
+    # Create sample input with shape [batch_size, channels, height, width]
+    inputs = torch.rand(size=(1, 3, 114, 10), dtype=torch.float32)  # Batch size of 1
+
+    # Move model and input to GPU if available
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    inputs = inputs.to(device)
+
+    # Set the model to evaluation mode
+    model.eval()
+
+    # Measure inference time
+    with torch.no_grad():  # Disable gradient calculation for inference
+        if device.type == 'cuda':
+            # Use CUDA events for GPU timing
+            start = torch.cuda.Event(enable_timing=True)
+            end = torch.cuda.Event(enable_timing=True)
+            
+            start.record()  # Start timing
+            output = model(inputs)  # Model inference
+            end.record()  # End timing
+            
+            # Waits for everything to finish running
+            torch.cuda.synchronize()
+            
+            # Calculate elapsed time
+            inference_time_ms = start.elapsed_time(end)
+            print(f"Inference Time in GPU: {inference_time_ms:.3f} ms")
+        
+        else:
+            # Use time.time() for CPU timing
+            start_time = time.time()
+            output = model(inputs)  # Model inference
+            end_time = time.time()
+            
+            # Calculate elapsed time in milliseconds
+            inference_time_ms = (end_time - start_time) * 1000
+            print(f"Inference Time: {inference_time_ms:.3f} ms")

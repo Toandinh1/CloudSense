@@ -86,7 +86,7 @@ else:
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-tnse_mode = True
+tnse_mode = False
 
 if tnse_mode:
     run_tsne(

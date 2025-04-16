@@ -19,10 +19,10 @@ class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
         self.SKunit1 = SKUnit(
-            in_features=3,
+            in_features=9,
             mid_features=16,
             out_features=32,
-            dim1=114,
+            dim1=30,
             dim2=10,
             pool_dim="freq-chan",
             M=1,
@@ -35,7 +35,7 @@ class Encoder(nn.Module):
             in_features=32,
             mid_features=64,
             out_features=128,
-            dim1=57,
+            dim1=15,
             dim2=8,
             pool_dim="freq-chan",
             M=1,
@@ -48,7 +48,7 @@ class Encoder(nn.Module):
             in_features=128,
             mid_features=64,
             out_features=32,
-            dim1=28,
+            dim1=7,
             dim2=2,
             pool_dim="freq-chan",
             M=1,
@@ -75,10 +75,10 @@ class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
         self.SKunit1 = SKUnit(
-            in_features=3,
+            in_features=9,
             mid_features=16,
             out_features=32,
-            dim1=114,
+            dim1=30,
             dim2=10,
             pool_dim="freq-chan",
             M=1,
@@ -91,7 +91,7 @@ class Discriminator(nn.Module):
             in_features=32,
             mid_features=64,
             out_features=128,
-            dim1=57,
+            dim1=15,
             dim2=8,
             pool_dim="freq-chan",
             M=1,
@@ -104,7 +104,7 @@ class Discriminator(nn.Module):
             in_features=128,
             mid_features=64,
             out_features=32,
-            dim1=28,
+            dim1=7,
             dim2=2,
             pool_dim="freq-chan",
             M=1,
@@ -116,7 +116,7 @@ class Discriminator(nn.Module):
         self.pool_1 = nn.AvgPool2d(2)
         self.pool_2 = nn.AvgPool2d(2)
 
-        self.fc1 = nn.Linear(32 * 28 * 2, 512)
+        self.fc1 = nn.Linear(32 * 7 * 1, 512)
         self.bn = nn.BatchNorm1d(512, momentum=0.9)
         self.fc2 = nn.Linear(512, 1)
         self.sigmoid = nn.Sigmoid()
@@ -185,7 +185,7 @@ class Decoder(nn.Module):
         )
         self.transposed_conv3 = nn.ConvTranspose2d(
             in_channels=32,
-            out_channels=3,
+            out_channels=9,
             kernel_size=3,
             stride=2,
             padding=1,
@@ -194,9 +194,9 @@ class Decoder(nn.Module):
         self.relu = nn.ReLU()
         self.bn1 = nn.BatchNorm2d(128)
         self.bn2 = nn.BatchNorm2d(32)
-        self.bn3 = nn.BatchNorm2d(3)
+        self.bn3 = nn.BatchNorm2d(9)
 
-        self.pool = nn.AdaptiveAvgPool2d((114, 10))
+        self.pool = nn.AdaptiveAvgPool2d((30, 5))
         # self.transposed_conv3 = nn.ConvTranspose2d(in_channels=64, out_channels=1, kernel_size=3, stride=2, padding=1, output_padding=1)
 
     def forward(self, x):
@@ -215,8 +215,172 @@ class Decoder(nn.Module):
 
 
 class CloudSense(nn.Module):
-    def __init__(self, config, output_hpe=34):
+    def __init__(self, config, output_hpe=36):
         super(CloudSense, self).__init__()
+        embedding_dim = config["embedding_dim"]
+        commitment_cost = config["commitment_cost"]
+        self.min_codebook_size = config["min_codebook_size"]
+        self.max_codebook_size = config["max_codebook_size"]
+        self.change_step = config["change_step"]
+
+        self.unreliable_mode = config["unreliable_mode"]
+        self.unrilable_rate_in_training = config["unrilable_rate_in_training"]
+
+        self.prev_loss = None
+
+        self._encoder = Encoder()
+        self._pre_vq_conv = nn.Sequential(
+            nn.Conv2d(
+                in_channels=32,
+                out_channels=embedding_dim,
+                kernel_size=1,
+                stride=1,
+            ),
+            nn.BatchNorm2d(embedding_dim),
+            nn.ReLU(),
+        )
+
+        self._trans_vq_vae = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=embedding_dim,
+                out_channels=96,
+                kernel_size=1,
+                stride=1,
+            ),
+            nn.BatchNorm2d(96),
+            nn.ReLU(),
+        )
+
+        self.regression = regression(
+            input_dim=embedding_dim * 7 * 1,
+            output_dim=output_hpe,
+            hidden_dim=32,
+        )
+        self._decoder = Decoder(in_channel=embedding_dim)
+        self.vq = VectorQuantize(
+            dim=56,
+            codebook_size=config["initial_cook_size"],
+            commitment_weight=commitment_cost,
+            decay=0.8,
+        )
+        self.embedding_dim = embedding_dim
+        self.commitment_cost = commitment_cost
+
+        self.recieved_indice_corrector = TamingStyleTransformer(
+            window_size=9, num_codebook_vectors=config["initial_cook_size"]
+        ).cuda()
+
+    def adjust_codebook_based_on_loss(self, current_loss, z):
+        if self.prev_loss is None:
+            self.prev_loss = current_loss
+            return
+
+        if current_loss < self.prev_loss:  # If loss improved
+            new_codebook_size = max(
+                self.min_codebook_size,
+                self.vq.codebook_size - self.change_step,
+            )
+        else:
+            new_codebook_size = self.vq.codebook_size
+        # else:  # If loss did not improve
+        #     new_codebook_size = min(self.max_codebook_size, self.vq.num_embeddings + self.change_step)
+
+        if new_codebook_size != self.vq.codebook_size:
+            self.vq = VectorQuantize(
+                dim=56,
+                codebook_size=new_codebook_size,
+                commitment_weight=self.commitment_cost,
+                decay=0.8,
+            ).cuda()
+            self.recieved_indice_corrector = TamingStyleTransformer(
+                window_size=9, num_codebook_vectors=new_codebook_size
+            ).cuda()
+            # print(f"Codebook size updated to {new_codebook_size} vector.")
+
+        self.prev_loss = current_loss
+
+    def forward(self, x, is_test=False, error_rate=None):
+        batch = x.shape[0]
+
+        # Encode input
+        z = self._encoder(x)
+        z = self._pre_vq_conv(z)
+        z = z.view(batch, -1, 56)
+
+        # Quantization
+        z_quantized, indices, vq_loss = self.vq(z)
+        if is_test:
+            if self.unreliable_mode == 0:
+                noisy_indices = apply_bit_error(
+                    indices.cpu(),
+                    error_rate=error_rate,
+                    num_embedding=self.vq.codebook_size,
+                )
+                # print(f"Noise index: {indices}")
+                # print(f"noisy index: {noisy_indices}")
+            elif self.unreliable_mode == 1:
+                noisy_indices = apply_bit_loss(
+                    indices.cpu(), loss_rate=error_rate
+                )
+            else:
+                noisy_indices = indices
+        else:
+            if self.unreliable_mode == 0:
+                noisy_indices = apply_bit_error(
+                    indices.cpu(),
+                    error_rate=self.unrilable_rate_in_training,
+                    num_embedding=self.vq.codebook_size,
+                )
+            elif self.unreliable_mode == 1:
+                noisy_indices = apply_bit_loss(indices.cpu(), loss_rate=0)
+            else:
+                noisy_indices = indices
+        noisy_indices = noisy_indices.cuda()
+        # print(torch.mean((noisy_indices == indices).float()))
+        # correct_indices = self.recieved_indice_corrector(noisy_indices)
+        # # print(correct_indices.dtype, indices.dtype)
+        # mask = (correct_indices == indices).float()
+        # accuracy_loss = 1 - mask.mean()
+        # cross_entropy_loss = F.cross_entropy(
+        #     correct_indices.float(), indices.float()
+        # )
+        # correct_loss = (accuracy_loss + cross_entropy_loss) / 2
+        # # Lưu toàn bộ tensor vào file văn bản
+        correct_indices = noisy_indices
+        z_reconstructed = self.vq.get_codes_from_indices(correct_indices)
+
+        # print(F.mse_loss(z_quantized, z_reconstructed), noisy_indices.shape)
+        # Reshape quantized vector for decoder and regression
+        correct_loss = 0
+        z_reconstructed = z.view(batch, self.embedding_dim, 7, 1)
+
+        # Calculate reconstructed output and regression prediction
+        y_p = self.regression(z_reconstructed)
+        r_x = self._decoder(z_reconstructed)
+
+        # Reshape regression output
+        y_p = y_p.reshape(batch, -1, 2)
+
+        # Compute losses
+        # print(r_x.shape, x.shape)
+        reconstruction_loss = F.mse_loss(r_x, x)
+
+        # Commitment loss
+        commitment_loss = self.commitment_cost * F.mse_loss(
+            z, z_quantized.detach()
+        )
+
+        # Codebook loss (encourage embedding vectors to be close to quantized ones)
+        codebook_loss = F.mse_loss(z.detach(), z_quantized)
+
+        # Total loss
+        vq_loss = reconstruction_loss + commitment_loss + codebook_loss
+
+        return correct_loss, vq_loss, z, r_x, y_p
+
+class CloudSenseWithoutTransformer(nn.Module):
+    def __init__(self, config, output_hpe=34):
+        super(CloudSenseWithoutTransformer, self).__init__()
         embedding_dim = config["embedding_dim"]
         commitment_cost = config["commitment_cost"]
         self.min_codebook_size = config["min_codebook_size"]
@@ -375,8 +539,7 @@ class CloudSense(nn.Module):
         vq_loss = reconstruction_loss + commitment_loss + codebook_loss
 
         return correct_loss, vq_loss, z, r_x, y_p
-
-
+    
 class TSNECloudSense(CloudSense):
     def __init__(self, config, output_hpe=34):
         super().__init__(config=config, output_hpe=output_hpe)
@@ -393,3 +556,60 @@ class TSNECloudSense(CloudSense):
         z_quantized, indices, vq_loss = self.vq(z)
 
         return z, z_quantized
+
+if __name__ == "__main__":
+    config =  {
+                "min_codebook_size": 32,
+                "max_codebook_size": 128,
+                "initial_cook_size": 32,
+                "change_step": 16,
+                "embedding_dim": 256,
+                "commitment_cost": 1,
+                "lr": 1e-2,
+                "momentum": 0.9,
+                "weight_decay": 1e-5,
+                "epoch": 20,
+                "unreliable_mode": 0,  # 0: bit error   #1: bit loss
+                "unrilable_rate_in_training": 0,
+                "lambda": 0.10,
+            }
+    model = TSNECloudSense(config)
+
+    # Create sample input with shape [batch_size, channels, height, width]
+    inputs = torch.rand(size=(1, 3, 114, 10), dtype=torch.float32)  # Batch size of 1
+
+    # Move model and input to GPU if available
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    inputs = inputs.to(device)
+
+    # Set the model to evaluation mode
+    model.eval()
+
+    # Measure inference time
+    with torch.no_grad():  # Disable gradient calculation for inference
+        if device.type == 'cuda':
+            # Use CUDA events for GPU timing
+            start = torch.cuda.Event(enable_timing=True)
+            end = torch.cuda.Event(enable_timing=True)
+            
+            start.record()  # Start timing
+            output = model(inputs)  # Model inference
+            end.record()  # End timing
+            
+            # Waits for everything to finish running
+            torch.cuda.synchronize()
+            
+            # Calculate elapsed time
+            inference_time_ms = start.elapsed_time(end)
+            print(f"Inference Time in GPU: {inference_time_ms:.3f} ms")
+        
+        else:
+            # Use time.time() for CPU timing
+            start_time = time.time()
+            output = model(inputs)  # Model inference
+            end_time = time.time()
+            
+            # Calculate elapsed time in milliseconds
+            inference_time_ms = (end_time - start_time) * 1000
+            print(f"Inference Time: {inference_time_ms:.3f} ms")
