@@ -6,7 +6,7 @@ TinySense is an efficient compression framework designed to solve the bottleneck
 
 ## 📄 Abstract
 <p align="center">
-  <img src="model/overview.pdf" alt="Alt text"/>
+  <img src="model/overview.jpg" alt="Alt text"/>
 </p>
 
 With the growing demand for device-free and privacy-preserving sensing solutions, Wi-Fi sensing has emerged as a promising approach for human pose estimation. However, existing methods often process vast amounts of CSI data directly, straining networking resources.
