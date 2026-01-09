@@ -43,7 +43,10 @@ TinySense operates under a **Split Computing** framework.
 
 To evaluate the resource consumption, we implement a real-world prototype with some Raspberry Pi/Jetson Nano serve as low-power devices, and a super workstation as the server.
 
-![image](assets/Prototype.png)
+<p align="center">
+  <img src="model/prototype.jpg" alt="Alt text"/>
+</p>
+
 
 ## 🚀 Key Features
 
