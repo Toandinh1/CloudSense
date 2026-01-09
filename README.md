@@ -63,7 +63,7 @@ TinySense operates under a **Split Computing** framework.
 
 ```bash
 # Clone the repository
-git clone https://github.com/Toandinh1/CloudSense.git
+git clone https://github.com/Toandinh1/TinySense.git
 cd CloudSense
 ```
 ### Install dependencies
