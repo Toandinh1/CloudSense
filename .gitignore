@@ -1,0 +1,9 @@
+#Remove spyder extension
+**.ini
+**.bak
+
+#Remove python extension
+*.pyc 
+
+# Remove checkpoint
+**.pt
