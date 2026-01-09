@@ -64,6 +64,14 @@ git clone https://github.com/Toandinh1/CloudSense.git
 cd CloudSense
 ```
 
+## Simulation
+- constant.py contains the config of all baselines and our approach. You change this by yourself.
+- Run:
+  ```bash
+  python main.py
+  ```
+  
+
 
 
 # Install dependencies
