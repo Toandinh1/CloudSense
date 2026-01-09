@@ -63,19 +63,31 @@ TinySense operates under a **Split Computing** framework.
 git clone https://github.com/Toandinh1/CloudSense.git
 cd CloudSense
 ```
-
-## Simulation
+### Install dependencies
+```bash
+pip install -r requirements.txt
+```
+### Simulation
 - constant.py contains the config of all baselines and our approach. You change this by yourself.
 - Run:
   ```bash
   python main.py
   ```
   
+---
 
+## 📜 Citation 
 
-
-# Install dependencies
+If you use this code or findings in your research, please cite: 
 ```bash
-pip install -r requirements.txt
+@inproceedings{Gian2026TinySense,
+  author    = {Gian, Toan D. and Tran, Dung T. and Pham, Viet Quoc and Restuccia, Francesco and Nguyen, Van Dinh},
+  title     = {{TinySense}: Effective {CSI} Compression for Scalable and Accurate {Wi-Fi} Sensing},
+  booktitle = {Proceedings of the 2026 IEEE International Conference on Pervasive Computing and Communications (PerCom)},
+  year      = {2026},
+  publisher = {IEEE},
+  note      = {Accepted for publication},
+  month     = {March}
+}
 ```
 
