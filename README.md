@@ -39,6 +39,12 @@ TinySense operates under a **Split Computing** framework.
 
 ---
 
+## Real-world Prototype
+
+To evaluate the resource consumption, we implement a real-world prototype with some Raspberry Pi/Jetson Nano serve as low-power devices, and a super workstation as the server.
+
+![image](assets/Prototype.png)
+
 ## 🚀 Key Features
 
 - **Extreme Compression**: Reduces CSI data size by up to **1710×** using learned vector quantization.
