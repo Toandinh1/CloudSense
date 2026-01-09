@@ -4,7 +4,7 @@
 ![PyTorch](https://img.shields.io/badge/PyTorch-Deep%20Learning-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**CloudSense** is a deep learning project designed for Wi-Fi-based Human Pose Estimation. It leverages **Selective Kernel Networks (SKNet)** to efficiently extract features and perform reconstruction and human pose estimation.
+**TinySense** is a deep learning project designed for Wi-Fi-based Human Pose Estimation. It leverages **Selective Kernel Networks (SKNet)** to efficiently extract features and perform reconstruction and human pose estimation.
 
 ## 📂 Project Structure
 
@@ -27,8 +27,8 @@ The repository is organized into the following modules:
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/Toandinh1/CloudSense.git
-    cd CloudSense
+    git clone https://github.com/Toandinh1/TinySense.git
+    cd TinySense
     ```
 
 2.  **Install dependencies:**
