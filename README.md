@@ -84,7 +84,7 @@ pip install -r requirements.txt
 If you use this code or findings in your research, please cite: 
 ```bash
 @inproceedings{Gian2026TinySense,
-  author    = {Gian, Toan D. and Tran, Dung T. and Pham, Viet Quoc and Restuccia, Francesco and Nguyen, Van Dinh},
+  author    = {Gian, Toan D.* and Tran, Dung T.* and Pham, Viet Quoc and Restuccia, Francesco and Nguyen, Van Dinh},
   title     = {{TinySense}: Effective {CSI} Compression for Scalable and Accurate {Wi-Fi} Sensing},
   booktitle = {Proceedings of the 2026 IEEE International Conference on Pervasive Computing and Communications (PerCom)},
   year      = {2026},
