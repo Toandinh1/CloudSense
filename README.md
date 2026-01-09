@@ -19,7 +19,10 @@ Experiments show that TinySense achieves up to **1.5× higher HPE accuracy ($PCK
 ---
 
 ## 🏗️ System Architecture
-![Description of Image](relative/path/to/image.png)
+<p align="center">
+  <img src="model/TinySense.jpg" alt="Alt text"/>
+</p>
+
 TinySense operates under a **Split Computing** framework.
 
 ### 1. Local Device (Edge)
