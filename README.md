@@ -1,4 +1,4 @@
-# CloudSense
+# TinySense
 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-Deep%20Learning-orange)
