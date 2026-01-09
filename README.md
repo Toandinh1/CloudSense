@@ -81,7 +81,7 @@ pip install -r requirements.txt
 
 ## 📜 Citation 
 
-If you use this code or findings in your research, please cite: 
+If you use this code or findings in your research, please cite: (* Authors indicate equal contribution)
 ```bash
 @inproceedings{Gian2026TinySense,
   author    = {Gian, Toan D.* and Tran, Dung T.* and Pham, Viet Quoc and Restuccia, Francesco and Nguyen, Van Dinh},
