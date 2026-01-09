@@ -53,7 +53,7 @@ TinySense operates under a **Split Computing** framework.
 
 - Python 3.8+
 - PyTorch 1.10+
-- NVIDIA GPU (for training / cloud inference)
+- NVIDIA GPU (for training/cloud inference)
 - Jetson Nano or Raspberry Pi 4/5 (for edge inference)
 
 ### Setup
@@ -67,4 +67,7 @@ cd CloudSense
 
 
 # Install dependencies
+```bash
 pip install -r requirements.txt
+```
+
